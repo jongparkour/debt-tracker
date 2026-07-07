@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="author" content="Jongparkour" />
+  <meta name="description" content="Offline debt & payment tracker in Philippine Peso. Built by Jongparkour." />
+  <title>Debt Tracker</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+  <header class="app-bar">
+    <h1>💰 Debt Tracker</h1>
+    <div class="app-bar-right">
+      <span id="offlineBadge" class="badge hidden">Offline</span>
+      <button id="settingsBtn" class="icon-btn hidden" title="Settings" aria-label="Settings">⚙️</button>
+      <button id="lockNowBtn" class="icon-btn hidden" title="Lock app" aria-label="Lock app">🔒</button>
+    </div>
+  </header>
+
+  <!-- ============ LOCK SCREEN (shown by default, JS hides it) ============ -->
+  <div id="lockScreen" class="lock">
+    <div class="lock-box">
+      <div class="lock-logo">💰</div>
+
+      <!-- First run: set a PIN -->
+      <div id="lockSetup" class="lock-panel hidden">
+        <h2>Set a PIN</h2>
+        <p class="muted">Protect your records with a PIN. You'll enter it to open the app.</p>
+        <input id="pinNew" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="New PIN (4–8 digits)" />
+        <input id="pinConfirm" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Confirm PIN" />
+        <button class="btn primary" id="pinSetBtn">Set PIN</button>
+        <p id="lockSetupMsg" class="lock-msg"></p>
+      </div>
+
+      <!-- Setup: show the recovery code -->
+      <div id="lockRecovery" class="lock-panel hidden">
+        <h2>Save your recovery code</h2>
+        <p class="muted">If you forget your PIN, this is the <b>only</b> way back in. Write it down and keep it somewhere safe — it won't be shown again.</p>
+        <div class="recovery-code" id="recCode"></div>
+        <button class="btn" id="recCopyBtn">Copy code</button>
+        <label class="rec-ack"><input type="checkbox" id="recAck" /> I've saved my recovery code</label>
+        <button class="btn primary" id="recContinueBtn">Continue</button>
+        <p id="recMsg" class="lock-msg"></p>
+      </div>
+
+      <!-- Optional: enroll biometrics -->
+      <div id="lockEnroll" class="lock-panel hidden">
+        <h2>Enable quick unlock?</h2>
+        <p class="muted">Use your fingerprint or face to unlock next time. Your PIN still works as a backup.</p>
+        <button class="btn primary" id="bioEnableBtn">Enable fingerprint / face</button>
+        <button class="btn" id="bioSkipBtn">Skip for now</button>
+        <p id="lockEnrollMsg" class="lock-msg"></p>
+      </div>
+
+      <!-- Returning: unlock -->
+      <div id="lockUnlock" class="lock-panel hidden">
+        <h2>Welcome back</h2>
+        <p class="muted">Enter your PIN to continue.</p>
+        <input id="pinEnter" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN" />
+        <button class="btn primary" id="pinUnlockBtn">Unlock</button>
+        <button class="btn hidden" id="bioUnlockBtn">👆 Use fingerprint / face</button>
+        <button class="btn ghost" id="forgotPinBtn">Forgot PIN?</button>
+        <p id="lockUnlockMsg" class="lock-msg"></p>
+      </div>
+
+      <!-- Forgot PIN: recover via code, or erase -->
+      <div id="lockForgot" class="lock-panel hidden">
+        <h2>Reset your PIN</h2>
+        <p class="muted">Enter your recovery code to set a new PIN.</p>
+        <input id="recInput" type="text" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" />
+        <button class="btn primary" id="recVerifyBtn">Verify code</button>
+        <button class="btn" id="forgotBackBtn">Back</button>
+        <p id="forgotMsg" class="lock-msg"></p>
+        <hr class="rec-hr" />
+        <button class="btn danger" id="resetAppBtn">Erase everything &amp; start over</button>
+        <p class="muted rec-small">Only if you've lost your code. This permanently deletes all debtors and payments. Export a CSV first if you still can.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LIST VIEW ============ -->
+  <main id="listView" class="view">
+    <section class="panel">
+      <h2>Add Debtor</h2>
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" placeholder="e.g. Juan Dela Cruz" />
+      </div>
+      <div class="field">
+        <label for="debt">Total Debt (₱)</label>
+        <input id="debt" type="number" inputmode="decimal" min="0" placeholder="0.00" />
+      </div>
+      <div class="field">
+        <label for="rule">Payment Rule</label>
+        <input id="rule" placeholder="e.g. ₱300 / day" />
+      </div>
+      <button class="btn primary" id="addDebtorBtn">Add Debtor</button>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Debtors</h2>
+        <span id="summary" class="muted"></span>
+      </div>
+
+      <div class="toolbar">
+        <input id="search" class="search" type="search" placeholder="🔍 Search by name" />
+        <select id="filter" class="filter">
+          <option value="all">All</option>
+          <option value="active">Active debts</option>
+          <option value="paid">Fully paid</option>
+        </select>
+      </div>
+
+      <div class="toolbar export-bar">
+        <button class="btn small" id="exportDebtorsBtn">⬇ Debtors CSV</button>
+        <button class="btn small" id="exportPaymentsBtn">⬇ Payments CSV</button>
+      </div>
+
+      <div id="list" class="cards"></div>
+      <p id="empty" class="empty hidden">No debtors yet. Add one above to get started.</p>
+      <p id="noMatch" class="empty hidden">No debtors match your search.</p>
+    </section>
+  </main>
+
+  <!-- ============ DETAILS VIEW ============ -->
+  <main id="detailView" class="view hidden">
+    <button class="btn ghost back" id="backBtn">← Back</button>
+    <div id="detailContent"></div>
+  </main>
+
+  <!-- ============ MODAL ============ -->
+  <div id="modalOverlay" class="overlay hidden">
+    <div class="modal">
+      <h3 id="modalTitle">Edit</h3>
+      <div id="modalBody"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="modalCancel">Cancel</button>
+        <button class="btn primary" id="modalSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <footer class="site-footer">
+    Jongparkour · Debt Tracker v1.0
+  </footer>
+
+  <script src="./db.js"></script>
+  <script src="./app.js"></script>
+  <script src="./auth.js"></script>
+</body>
+</html>

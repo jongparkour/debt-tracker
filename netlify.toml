@@ -1,0 +1,30 @@
+# Netlify config for Debt Tracker
+
+# Serve the Digital Asset Links file at the exact path Android checks.
+# We keep a copy at the site ROOT (assetlinks.json) because Windows folder-drags
+# often skip the hidden ".well-known" folder. This rewrite maps the required
+# well-known path to that root file, so it works no matter how you deploy.
+[[redirects]]
+  from = "/.well-known/assetlinks.json"
+  to = "/assetlinks.json"
+  status = 200
+  force = true
+
+# Make sure both paths are served as JSON.
+[[headers]]
+  for = "/assetlinks.json"
+  [headers.values]
+    Content-Type = "application/json"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/.well-known/assetlinks.json"
+  [headers.values]
+    Content-Type = "application/json"
+    Access-Control-Allow-Origin = "*"
+
+# Long-cache the static icons (they rarely change).
+[[headers]]
+  for = "/icon-*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

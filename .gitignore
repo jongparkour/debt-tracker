@@ -1,0 +1,20 @@
+# --- Secrets: NEVER commit signing keys ---
+*.keystore
+*.jks
+signing-key-info.txt
+
+# --- Build / package artifacts ---
+*.apk
+*.aab
+*.zip
+debt-tracker-deploy.zip
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+*.log
+
+# --- Netlify local ---
+.netlify/

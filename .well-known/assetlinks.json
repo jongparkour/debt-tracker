@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.netlify.iridescent_mooncake_68869c.twa",
+      "sha256_cert_fingerprints": [
+        "98:52:BE:FB:96:91:05:11:7F:35:E0:02:7B:E8:32:5A:A6:C2:49:B8:37:E4:34:A4:B0:07:41:10:78:62:42:11"
+      ]
+    }
+  }
+]
