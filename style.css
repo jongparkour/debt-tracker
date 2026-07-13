@@ -1,14 +1,48 @@
+/* ===== Dark theme = default (current design) ===== */
 :root {
+  --bg: #0b1220;
+  --card: #131c2e;
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --line: #24314a;
+  --input-bg: #0e1626;
+  --btn-bg: #1b2740;
+  --subtle-bg: #0e1626;
+  --pill-bg: #78350f;
+  --pill-ink: #fde68a;
+  --pill-paid-bg: #14532d;
+  --pill-paid-ink: #86efac;
+  --danger-border: #7f1d1d;
+
+  --brand: #14a89b;
+  --brand-ink: #ffffff;
+  --danger: #f87171;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== Light theme (opt-in via toggle) ===== */
+:root[data-theme="light"] {
   --bg: #f1f5f9;
   --card: #ffffff;
   --ink: #0f172a;
   --muted: #64748b;
   --line: #e2e8f0;
+  --input-bg: #ffffff;
+  --btn-bg: #ffffff;
+  --subtle-bg: #f8fafc;
+  --pill-bg: #fef3c7;
+  --pill-ink: #92400e;
+  --pill-paid-bg: #dcfce7;
+  --pill-paid-ink: #16a34a;
+  --danger-border: #fecaca;
+
   --brand: #0f766e;
-  --brand-ink: #ffffff;
   --danger: #dc2626;
   --ok: #16a34a;
-  --radius: 14px;
+  --warn: #b45309;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
@@ -121,7 +155,7 @@ body {
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 0.12em;
-  background: var(--bg);
+  background: var(--subtle-bg);
   border: 1px dashed var(--brand);
   border-radius: 10px;
   padding: 14px 10px;
@@ -194,7 +228,7 @@ input {
   border: 1px solid var(--line);
   border-radius: 10px;
   font-size: 1rem;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--ink);
 }
 input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
@@ -202,7 +236,7 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
 /* ---------- Buttons ---------- */
 .btn {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--btn-bg);
   color: var(--ink);
   padding: 10px 14px;
   border-radius: 10px;
@@ -213,7 +247,7 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
 }
 .btn:active { filter: brightness(0.95); }
 .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
-.btn.danger { color: var(--danger); border-color: #fecaca; }
+.btn.danger { color: var(--danger); border-color: var(--danger-border); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.small { padding: 8px 11px; font-size: 0.82rem; }
 .btn.tiny { padding: 5px 9px; font-size: 0.75rem; }
@@ -234,15 +268,11 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
   border: 1px solid var(--line);
   border-radius: 10px;
   font-size: 0.9rem;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--ink);
 }
 .export-bar { margin-bottom: 16px; }
 .export-bar .btn { flex: 1 1 auto; }
-
-@media (prefers-color-scheme: dark) {
-  .toolbar .filter { background: #0e1626; }
-}
 
 /* ---------- Cards ---------- */
 .cards { display: flex; flex-direction: column; gap: 14px; }
@@ -263,15 +293,15 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
 .card-head h2, .card-head h3 { margin: 0; font-size: 1.1rem; }
 
 .pill {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--pill-bg);
+  color: var(--pill-ink);
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
 }
-.pill.paid { background: #dcfce7; color: var(--ok); }
+.pill.paid { background: var(--pill-paid-bg); color: var(--pill-paid-ink); }
 
 .stats {
   display: grid;
@@ -288,7 +318,7 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
   margin: 0 0 10px;
   font-size: 0.85rem;
   color: var(--muted);
-  background: #f8fafc;
+  background: var(--subtle-bg);
   padding: 8px 10px;
   border-radius: 8px;
 }
@@ -332,8 +362,10 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
 .month-head {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   padding: 11px 14px;
-  background: #f8fafc;
+  background: var(--subtle-bg);
   border-bottom: 1px solid var(--line);
   font-size: 0.9rem;
 }
@@ -451,21 +483,85 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
   transform: translate(-50%, 0);
 }
 
-/* ---------- Dark mode ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1220;
-    --card: #131c2e;
-    --ink: #e2e8f0;
-    --muted: #94a3b8;
-    --line: #24314a;
-  }
-  input { background: #0e1626; }
-  .btn { background: #1b2740; }
-  .btn.danger { border-color: #7f1d1d; }
-  .rule, .month-head { background: #0e1626; }
-  .pill { background: #78350f; color: #fde68a; }
-  .pill.paid { background: #14532d; color: #86efac; }
+/* ---------- Monthly expected-vs-paid indicators ---------- */
+.month-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.month-status.met  { background: var(--pill-paid-bg); color: var(--pill-paid-ink); }
+.month-status.short{ background: var(--pill-bg);      color: var(--pill-ink); }
+.month-expected {
+  font-size: 0.75rem;
+  color: var(--muted);
+  padding: 6px 14px 0;
+}
+.month-bar {
+  height: 5px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 6px 14px 10px;
+}
+.month-bar span { display: block; height: 100%; background: var(--brand); }
+.month-bar span.over { background: var(--ok); }
+
+/* This-month chip on the person card */
+.this-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+  background: var(--subtle-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin: 0 0 12px;
+}
+.this-month .mt-label { color: var(--muted); }
+
+/* ---------- Person loans (detail view) ---------- */
+.loans { margin: 14px 0 18px; }
+.loans-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.loans-head h3 { margin: 0; font-size: 1rem; }
+.loan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.loan-info b { font-size: 0.95rem; }
+.loan-info small { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+.loan-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ---------- Settings rows ---------- */
+.settings-section-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 16px 0 6px;
+}
+.settings-section-title:first-of-type { margin-top: 0; }
+.theme-seg { display: flex; gap: 6px; }
+.theme-seg .btn { flex: 1 1 auto; }
+.theme-seg .btn.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
 }
 
 /* ---------- Respect users who prefer no motion ---------- */

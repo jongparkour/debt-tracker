@@ -64,10 +64,17 @@
     const salt = randBytes(16);
     const iter = 150000;
     const hash = await derive(pin, salt, iter);
+    // Store the length so we know when a typed PIN is "complete" (auto-unlock).
     localStorage.setItem(
       LS_PIN,
-      JSON.stringify({ salt: bufToB64(salt), hash, iter })
+      JSON.stringify({ salt: bufToB64(salt), hash, iter, len: pin.length })
     );
+  }
+
+  /** Stored PIN length, or null if unknown (older installs). */
+  function pinLen() {
+    const rec = JSON.parse(localStorage.getItem(LS_PIN) || "null");
+    return rec && typeof rec.len === "number" ? rec.len : null;
   }
 
   async function verifyPin(pin) {
@@ -219,7 +226,6 @@
   function unlockApp() {
     unlocked = true;
     hide($("lockScreen"));
-    show($("lockNowBtn"));
     show($("settingsBtn"));
     // Clear any typed PIN from the DOM.
     ["pinNew", "pinConfirm", "pinEnter"].forEach((id) => {
@@ -230,7 +236,6 @@
   async function showUnlock() {
     panel("lockUnlock");
     show($("lockScreen"));
-    hide($("lockNowBtn"));
     hide($("settingsBtn"));
     const bioBtn = $("bioUnlockBtn");
     if (biometricEnrolled() && (await biometricSupported())) {
@@ -248,12 +253,21 @@
     openModal(
       "Settings",
       `
+      <div class="settings-section-title">Appearance</div>
+      <div class="theme-seg">
+        <button type="button" class="btn small" id="s_themeDark">🌙 Dark</button>
+        <button type="button" class="btn small" id="s_themeLight">☀️ Light</button>
+      </div>
+
+      <div class="settings-section-title">Change PIN</div>
       <div class="field"><label>Current PIN</label>
         <input id="s_cur" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
       <div class="field"><label>New PIN (4–8 digits)</label>
         <input id="s_new" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
       <div class="field"><label>Confirm New PIN</label>
         <input id="s_conf" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
+
+      <div class="settings-section-title">Security</div>
       <div class="settings-bio">
         <span id="s_bioLabel" class="muted"></span>
         <button type="button" class="btn small hidden" id="s_bioBtn"></button>
@@ -263,6 +277,8 @@
         <button type="button" class="btn small" id="s_recBtn"></button>
       </div>
       <div id="s_recBox" class="recovery-code hidden"></div>
+
+      <button type="button" class="btn" id="s_lockBtn" style="width:100%;margin-top:14px;">🔒 Lock app now</button>
       <p id="s_msg" class="lock-msg"></p>
       `,
       async () => {
@@ -351,6 +367,30 @@
       show(recBox);
       refreshRecRow();
       $("s_msg").textContent = "New code shown above — save it. The old one no longer works.";
+    });
+
+    // --- Appearance (theme) ---
+    const darkBtn = $("s_themeDark");
+    const lightBtn = $("s_themeLight");
+    function refreshTheme() {
+      const cur = window.getTheme ? getTheme() : "dark";
+      darkBtn.classList.toggle("active", cur === "dark");
+      lightBtn.classList.toggle("active", cur === "light");
+    }
+    refreshTheme();
+    darkBtn.addEventListener("click", () => {
+      if (window.applyTheme) applyTheme("dark");
+      refreshTheme();
+    });
+    lightBtn.addEventListener("click", () => {
+      if (window.applyTheme) applyTheme("light");
+      refreshTheme();
+    });
+
+    // --- Lock now ---
+    $("s_lockBtn").addEventListener("click", () => {
+      closeModal();
+      lockNow();
     });
   }
 
@@ -471,20 +511,39 @@
     $("bioSkipBtn").addEventListener("click", unlockApp);
 
     // --- Unlock panel ---
-    async function tryPin() {
+    let pinChecking = false;
+    async function tryPin(silent) {
+      if (pinChecking) return;
       const pin = $("pinEnter").value.trim();
       if (!pin) return;
-      if (await verifyPin(pin)) {
-        unlockApp();
-      } else {
-        msg($("lockUnlockMsg"), "Wrong PIN. Try again.");
-        $("pinEnter").value = "";
-        shake();
+      pinChecking = true;
+      try {
+        if (await verifyPin(pin)) {
+          // Migrate older installs so auto-unlock works next time.
+          const rec = JSON.parse(localStorage.getItem(LS_PIN) || "null");
+          if (rec && typeof rec.len !== "number") {
+            rec.len = pin.length;
+            localStorage.setItem(LS_PIN, JSON.stringify(rec));
+          }
+          unlockApp();
+        } else if (!silent) {
+          msg($("lockUnlockMsg"), "Wrong PIN. Try again.");
+          $("pinEnter").value = "";
+          shake();
+        }
+      } finally {
+        pinChecking = false;
       }
     }
-    $("pinUnlockBtn").addEventListener("click", tryPin);
+    $("pinUnlockBtn").addEventListener("click", () => tryPin(false));
     $("pinEnter").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") tryPin();
+      if (e.key === "Enter") tryPin(false);
+    });
+    // Auto-unlock: check as soon as the PIN reaches its known length.
+    $("pinEnter").addEventListener("input", () => {
+      const len = pinLen();
+      const val = $("pinEnter").value.trim();
+      if (len && val.length === len) tryPin(true);
     });
 
     $("bioUnlockBtn").addEventListener("click", async () => {
@@ -497,10 +556,7 @@
       }
     });
 
-    // Manual lock button
-    $("lockNowBtn").addEventListener("click", lockNow);
-
-    // Settings (Change PIN / biometrics)
+    // Settings (single button: theme, PIN, biometrics, recovery, lock)
     $("settingsBtn").addEventListener("click", openSettings);
 
     // Auto re-lock after being in the background a while

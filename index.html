@@ -7,6 +7,17 @@
   <meta name="author" content="Jongparkour" />
   <meta name="description" content="Offline debt & payment tracker in Philippine Peso. Built by Jongparkour." />
   <title>Debt Tracker</title>
+  <script>
+    /* Apply saved theme before paint to avoid a flash. Default = dark. */
+    (function () {
+      try {
+        var t = localStorage.getItem("dt_theme") || "dark";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/png" href="./icon-192.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
@@ -19,7 +30,6 @@
     <div class="app-bar-right">
       <span id="offlineBadge" class="badge hidden">Offline</span>
       <button id="settingsBtn" class="icon-btn hidden" title="Settings" aria-label="Settings">⚙️</button>
-      <button id="lockNowBtn" class="icon-btn hidden" title="Lock app" aria-label="Lock app">🔒</button>
     </div>
   </header>
 
@@ -100,6 +110,10 @@
         <label for="rule">Payment Rule</label>
         <input id="rule" placeholder="e.g. ₱300 / day" />
       </div>
+      <div class="field">
+        <label for="target">Expected Monthly Payment (₱) — optional</label>
+        <input id="target" type="number" inputmode="decimal" min="0" placeholder="e.g. 2000" />
+      </div>
       <button class="btn primary" id="addDebtorBtn">Add Debtor</button>
     </section>
 
@@ -150,7 +164,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="site-footer">
-    Jongparkour · Debt Tracker v1.0
+    Jongparkour · Debt Tracker v1.1
   </footer>
 
   <script src="./db.js"></script>
