@@ -419,15 +419,8 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
-/* Floating (settings) mode: transparent + click-through so the page behind
-   still scrolls; only the panel itself captures interaction. */
-.overlay.floating {
-  background: transparent;
-  pointer-events: none;
-}
-.overlay.floating .modal {
-  pointer-events: auto;
-}
+/* While any modal is open, prevent the page behind it from scrolling. */
+body.modal-open { overflow: hidden; }
 .modal h3 { color: var(--ink); }
 .modal .field label { color: var(--muted); }
 .modal h3 { margin: 0 0 14px; }

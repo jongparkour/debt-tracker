@@ -11,22 +11,30 @@
   const LS_CRED = "dt_cred"; // base64 credential id for biometrics
   const LS_UID = "dt_uid"; // base64 WebAuthn user handle
   const LS_REC = "dt_rec"; // { salt, hash, iter } for the recovery code
-  const LS_RELOCK = "dt_relock"; // auto-lock delay in ms ("Infinity" = never)
-  const DEFAULT_RELOCK_MS = 30000; // default: re-lock 30s after backgrounding
+  const INACTIVITY_MS = 30000; // lock after 30s with no interaction
   const FEEDBACK_EMAIL = "libosadajosephy@gmail.com";
 
   let currentRecoveryCode = ""; // held only in memory while shown at setup
+  let lastActivity = 0; // timestamp of last user interaction
+  let inactivityInterval = null;
 
-  /** Auto-lock delay in ms; Infinity means "never auto-lock". */
-  function getRelockMs() {
-    const raw = localStorage.getItem(LS_RELOCK);
-    if (raw === null) return DEFAULT_RELOCK_MS;
-    if (raw === "Infinity") return Infinity;
-    const n = Number(raw);
-    return isNaN(n) ? DEFAULT_RELOCK_MS : n;
+  function now() {
+    return new Date().getTime();
   }
-  function setRelockMs(ms) {
-    localStorage.setItem(LS_RELOCK, ms === Infinity ? "Infinity" : String(ms));
+
+  /** Start the 30s inactivity watchdog (also resets the clock). */
+  function startInactivity() {
+    lastActivity = now();
+    stopInactivity();
+    inactivityInterval = setInterval(() => {
+      if (unlocked && now() - lastActivity >= INACTIVITY_MS) lockNow();
+    }, 1000);
+  }
+  function stopInactivity() {
+    if (inactivityInterval) {
+      clearInterval(inactivityInterval);
+      inactivityInterval = null;
+    }
   }
 
   const $ = (id) => document.getElementById(id);
@@ -213,7 +221,6 @@
   /* ---------------- UI control ---------------- */
 
   let unlocked = false;
-  let hiddenAt = 0;
 
   function show(el) {
     el.classList.remove("hidden");
@@ -241,6 +248,7 @@
     unlocked = true;
     hide($("lockScreen"));
     show($("settingsBtn"));
+    startInactivity();
     // Clear any typed PIN from the DOM.
     ["pinNew", "pinConfirm", "pinEnter"].forEach((id) => {
       if ($(id)) $(id).value = "";
@@ -282,17 +290,7 @@
         <input id="s_conf" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
 
       <div class="settings-section-title">Security</div>
-      <div class="field">
-        <label for="s_relock">Auto-lock when app is closed</label>
-        <select id="s_relock" class="filter" style="width:100%;">
-          <option value="0">Immediately</option>
-          <option value="30000">After 30 seconds</option>
-          <option value="60000">After 1 minute</option>
-          <option value="300000">After 5 minutes</option>
-          <option value="900000">After 15 minutes</option>
-          <option value="Infinity">Never (only manual lock)</option>
-        </select>
-      </div>
+      <p class="rec-small muted" style="margin:0 0 10px;">Auto-locks after 30 seconds of inactivity.</p>
       <div class="settings-bio">
         <span id="s_bioLabel" class="muted"></span>
         <button type="button" class="btn small hidden" id="s_bioBtn"></button>
@@ -331,8 +329,7 @@
         await setPin(nw);
         closeModal();
         if (window.toast) toast("PIN changed.");
-      },
-      { floating: true }
+      }
     );
 
     // Configure the biometric row based on device support + enrollment.
@@ -420,16 +417,6 @@
       refreshTheme();
     });
 
-    // --- Auto-lock delay ---
-    const relockSel = $("s_relock");
-    const curRelock = getRelockMs();
-    relockSel.value = curRelock === Infinity ? "Infinity" : String(curRelock);
-    relockSel.addEventListener("change", () => {
-      const v = relockSel.value === "Infinity" ? Infinity : Number(relockSel.value);
-      setRelockMs(v);
-      if (window.toast) toast("Auto-lock updated.");
-    });
-
     // --- Feedback (opens the user's email app) ---
     $("s_feedbackBtn").addEventListener("click", () => {
       const text = $("s_feedback").value.trim();
@@ -460,6 +447,7 @@
 
   function lockNow() {
     unlocked = false;
+    stopInactivity();
     showUnlock();
     setTimeout(() => $("pinEnter") && $("pinEnter").focus(), 50);
   }
@@ -623,14 +611,27 @@
     // Settings (single button: theme, PIN, biometrics, recovery, lock)
     $("settingsBtn").addEventListener("click", openSettings);
 
-    // Auto re-lock after being in the background longer than the chosen delay.
+    // Track interaction so we can lock after 30s of inactivity.
+    ["pointerdown", "keydown", "click", "scroll", "touchstart"].forEach((ev) =>
+      document.addEventListener(
+        ev,
+        () => {
+          if (unlocked) lastActivity = now();
+        },
+        { passive: true }
+      )
+    );
+
+    // Backgrounding does NOT lock immediately. On return, lock only if the
+    // total inactivity (incl. time away) has reached 30s.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        hiddenAt = new Date().getTime();
-      } else if (unlocked && hasPin() && hiddenAt) {
-        const delay = getRelockMs();
-        if (delay !== Infinity && new Date().getTime() - hiddenAt >= delay) {
+        stopInactivity(); // timers are unreliable in the background
+      } else if (unlocked && hasPin()) {
+        if (now() - lastActivity >= INACTIVITY_MS) {
           lockNow();
+        } else {
+          startInactivity(); // resume with a fresh window
         }
       }
     });
