@@ -12,19 +12,48 @@
   const LS_UID = "dt_uid"; // base64 WebAuthn user handle
   const LS_REC = "dt_rec"; // { salt, hash, iter } for the recovery code
   const INACTIVITY_MS = 30000; // lock after 30s with no interaction
+  const LS_ACTIVITY = "dt_active"; // last-activity timestamp (persists reloads)
   const FEEDBACK_EMAIL = "libosadajosephy@gmail.com";
 
   let currentRecoveryCode = ""; // held only in memory while shown at setup
   let lastActivity = 0; // timestamp of last user interaction
+  let lastWrite = 0;
   let inactivityInterval = null;
 
   function now() {
     return new Date().getTime();
   }
 
+  /** Record activity; persist to storage (throttled) so reloads remember it. */
+  function bumpActivity() {
+    lastActivity = now();
+    if (lastActivity - lastWrite > 2000) {
+      lastWrite = lastActivity;
+      try {
+        localStorage.setItem(LS_ACTIVITY, String(lastActivity));
+      } catch (e) {}
+    }
+  }
+  function persistActivity() {
+    try {
+      localStorage.setItem(LS_ACTIVITY, String(lastActivity));
+    } catch (e) {}
+  }
+  function clearActivity() {
+    try {
+      localStorage.removeItem(LS_ACTIVITY);
+    } catch (e) {}
+  }
+  /** True if last activity (incl. before a reload) is within the 30s window. */
+  function withinGrace() {
+    const stored = Number(localStorage.getItem(LS_ACTIVITY) || 0);
+    return stored > 0 && now() - stored < INACTIVITY_MS;
+  }
+
   /** Start the 30s inactivity watchdog (also resets the clock). */
   function startInactivity() {
     lastActivity = now();
+    persistActivity();
     stopInactivity();
     inactivityInterval = setInterval(() => {
       if (unlocked && now() - lastActivity >= INACTIVITY_MS) lockNow();
@@ -448,6 +477,7 @@
   function lockNow() {
     unlocked = false;
     stopInactivity();
+    clearActivity(); // a real lock must survive a refresh
     showUnlock();
     setTimeout(() => $("pinEnter") && $("pinEnter").focus(), 50);
   }
@@ -455,10 +485,13 @@
   /* ---------------- Wire up ---------------- */
 
   function wire() {
-    // First run vs returning
+    // First run vs returning.
     if (!hasPin()) {
       panel("lockSetup");
       show($("lockScreen"));
+    } else if (withinGrace()) {
+      // Refreshed/reopened within 30s of last use → skip the lock screen.
+      unlockApp();
     } else {
       showUnlock();
     }
@@ -616,24 +649,28 @@
       document.addEventListener(
         ev,
         () => {
-          if (unlocked) lastActivity = now();
+          if (unlocked) bumpActivity();
         },
         { passive: true }
       )
     );
 
-    // Backgrounding does NOT lock immediately. On return, lock only if the
-    // total inactivity (incl. time away) has reached 30s.
+    // Persist the timestamp when leaving/closing so a reopen can honor the grace.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
+        if (unlocked) persistActivity();
         stopInactivity(); // timers are unreliable in the background
       } else if (unlocked && hasPin()) {
+        // Returning: lock only if inactive (incl. time away) for >= 30s.
         if (now() - lastActivity >= INACTIVITY_MS) {
           lockNow();
         } else {
           startInactivity(); // resume with a fresh window
         }
       }
+    });
+    window.addEventListener("pagehide", () => {
+      if (unlocked) persistActivity();
     });
   }
 
