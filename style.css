@@ -222,7 +222,7 @@ body {
   color: var(--muted);
   margin-bottom: 5px;
 }
-input {
+input, textarea, select {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--line);
@@ -230,8 +230,13 @@ input {
   font-size: 1rem;
   background: var(--input-bg);
   color: var(--ink);
+  font-family: inherit;
 }
-input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
+textarea { resize: vertical; min-height: 68px; }
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--brand);
+  border-color: var(--brand);
+}
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -409,7 +414,19 @@ input:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
   padding: 20px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* Floating (settings) mode: transparent + click-through so the page behind
+   still scrolls; only the panel itself captures interaction. */
+.overlay.floating {
+  background: transparent;
+  pointer-events: none;
+}
+.overlay.floating .modal {
+  pointer-events: auto;
 }
 .modal h3 { color: var(--ink); }
 .modal .field label { color: var(--muted); }

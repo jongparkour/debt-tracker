@@ -513,15 +513,23 @@ async function showDetail(repId) {
 
 let modalSaveHandler = null;
 
-function openModal(title, bodyHtml, onSave) {
+/**
+ * opts.floating — render as a non-blocking panel: no dark backdrop and the
+ * overlay is click-through, so the UI behind it can still be scrolled.
+ */
+function openModal(title, bodyHtml, onSave, opts = {}) {
   $("modalTitle").textContent = title;
   $("modalBody").innerHTML = bodyHtml;
   modalSaveHandler = onSave;
-  $("modalOverlay").classList.remove("hidden");
+  const overlay = $("modalOverlay");
+  overlay.classList.toggle("floating", !!opts.floating);
+  overlay.classList.remove("hidden");
 }
 
 function closeModal() {
-  $("modalOverlay").classList.add("hidden");
+  const overlay = $("modalOverlay");
+  overlay.classList.add("hidden");
+  overlay.classList.remove("floating");
   $("modalBody").innerHTML = "";
   modalSaveHandler = null;
 }
@@ -850,6 +858,7 @@ if ("serviceWorker" in navigator) {
 /* -------------------- Maker's mark -------------------- */
 
 const APP_VERSION = "1.1";
+window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
 console.log(

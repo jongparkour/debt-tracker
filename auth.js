@@ -7,13 +7,27 @@
 (function () {
   "use strict";
 
-  const LS_PIN = "dt_pin"; // { salt, hash, iter }
+  const LS_PIN = "dt_pin"; // { salt, hash, iter, len }
   const LS_CRED = "dt_cred"; // base64 credential id for biometrics
   const LS_UID = "dt_uid"; // base64 WebAuthn user handle
   const LS_REC = "dt_rec"; // { salt, hash, iter } for the recovery code
-  const RELOCK_MS = 30000; // re-lock if app was in background >= 30s
+  const LS_RELOCK = "dt_relock"; // auto-lock delay in ms ("Infinity" = never)
+  const DEFAULT_RELOCK_MS = 30000; // default: re-lock 30s after backgrounding
+  const FEEDBACK_EMAIL = "libosadajosephy@gmail.com";
 
   let currentRecoveryCode = ""; // held only in memory while shown at setup
+
+  /** Auto-lock delay in ms; Infinity means "never auto-lock". */
+  function getRelockMs() {
+    const raw = localStorage.getItem(LS_RELOCK);
+    if (raw === null) return DEFAULT_RELOCK_MS;
+    if (raw === "Infinity") return Infinity;
+    const n = Number(raw);
+    return isNaN(n) ? DEFAULT_RELOCK_MS : n;
+  }
+  function setRelockMs(ms) {
+    localStorage.setItem(LS_RELOCK, ms === Infinity ? "Infinity" : String(ms));
+  }
 
   const $ = (id) => document.getElementById(id);
 
@@ -268,6 +282,17 @@
         <input id="s_conf" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
 
       <div class="settings-section-title">Security</div>
+      <div class="field">
+        <label for="s_relock">Auto-lock when app is closed</label>
+        <select id="s_relock" class="filter" style="width:100%;">
+          <option value="0">Immediately</option>
+          <option value="30000">After 30 seconds</option>
+          <option value="60000">After 1 minute</option>
+          <option value="300000">After 5 minutes</option>
+          <option value="900000">After 15 minutes</option>
+          <option value="Infinity">Never (only manual lock)</option>
+        </select>
+      </div>
       <div class="settings-bio">
         <span id="s_bioLabel" class="muted"></span>
         <button type="button" class="btn small hidden" id="s_bioBtn"></button>
@@ -277,6 +302,13 @@
         <button type="button" class="btn small" id="s_recBtn"></button>
       </div>
       <div id="s_recBox" class="recovery-code hidden"></div>
+
+      <div class="settings-section-title">Feedback</div>
+      <div class="field">
+        <label for="s_feedback">Suggestions to improve the app</label>
+        <textarea id="s_feedback" rows="3" placeholder="Tell the developer what to change or add…"></textarea>
+      </div>
+      <button type="button" class="btn" id="s_feedbackBtn" style="width:100%;">✉️ Send feedback</button>
 
       <button type="button" class="btn" id="s_lockBtn" style="width:100%;margin-top:14px;">🔒 Lock app now</button>
       <p id="s_msg" class="lock-msg"></p>
@@ -299,7 +331,8 @@
         await setPin(nw);
         closeModal();
         if (window.toast) toast("PIN changed.");
-      }
+      },
+      { floating: true }
     );
 
     // Configure the biometric row based on device support + enrollment.
@@ -385,6 +418,37 @@
     lightBtn.addEventListener("click", () => {
       if (window.applyTheme) applyTheme("light");
       refreshTheme();
+    });
+
+    // --- Auto-lock delay ---
+    const relockSel = $("s_relock");
+    const curRelock = getRelockMs();
+    relockSel.value = curRelock === Infinity ? "Infinity" : String(curRelock);
+    relockSel.addEventListener("change", () => {
+      const v = relockSel.value === "Infinity" ? Infinity : Number(relockSel.value);
+      setRelockMs(v);
+      if (window.toast) toast("Auto-lock updated.");
+    });
+
+    // --- Feedback (opens the user's email app) ---
+    $("s_feedbackBtn").addEventListener("click", () => {
+      const text = $("s_feedback").value.trim();
+      if (!text) {
+        $("s_msg").textContent = "Type your suggestion first.";
+        return;
+      }
+      const subject = "Debt Tracker feedback (v" + (window.APP_VERSION || "1") + ")";
+      const url =
+        "mailto:" +
+        FEEDBACK_EMAIL +
+        "?subject=" +
+        encodeURIComponent(subject) +
+        "&body=" +
+        encodeURIComponent(text);
+      window.location.href = url;
+      $("s_feedback").value = "";
+      $("s_msg").textContent = "";
+      if (window.toast) toast("Opening your email app…");
     });
 
     // --- Lock now ---
@@ -559,12 +623,15 @@
     // Settings (single button: theme, PIN, biometrics, recovery, lock)
     $("settingsBtn").addEventListener("click", openSettings);
 
-    // Auto re-lock after being in the background a while
+    // Auto re-lock after being in the background longer than the chosen delay.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         hiddenAt = new Date().getTime();
       } else if (unlocked && hasPin() && hiddenAt) {
-        if (new Date().getTime() - hiddenAt >= RELOCK_MS) lockNow();
+        const delay = getRelockMs();
+        if (delay !== Infinity && new Date().getTime() - hiddenAt >= delay) {
+          lockNow();
+        }
       }
     });
   }
