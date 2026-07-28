@@ -11,53 +11,24 @@
   const LS_CRED = "dt_cred"; // base64 credential id for biometrics
   const LS_UID = "dt_uid"; // base64 WebAuthn user handle
   const LS_REC = "dt_rec"; // { salt, hash, iter } for the recovery code
-  const INACTIVITY_MS = 30000; // lock after 30s with no interaction
-  const LS_ACTIVITY = "dt_active"; // last-activity timestamp (persists reloads)
+  const INACTIVITY_MS = 5 * 60 * 1000; // lock after 5 min of no interaction
   const FEEDBACK_EMAIL = "libosadajosephy@gmail.com";
 
   let currentRecoveryCode = ""; // held only in memory while shown at setup
-  let lastActivity = 0; // timestamp of last user interaction
-  let lastWrite = 0;
+  let lastActivity = 0; // timestamp of last user interaction (foreground)
   let inactivityInterval = null;
 
   function now() {
     return new Date().getTime();
   }
 
-  /** Record activity; persist to storage (throttled) so reloads remember it. */
-  function bumpActivity() {
-    lastActivity = now();
-    if (lastActivity - lastWrite > 2000) {
-      lastWrite = lastActivity;
-      try {
-        localStorage.setItem(LS_ACTIVITY, String(lastActivity));
-      } catch (e) {}
-    }
-  }
-  function persistActivity() {
-    try {
-      localStorage.setItem(LS_ACTIVITY, String(lastActivity));
-    } catch (e) {}
-  }
-  function clearActivity() {
-    try {
-      localStorage.removeItem(LS_ACTIVITY);
-    } catch (e) {}
-  }
-  /** True if last activity (incl. before a reload) is within the 30s window. */
-  function withinGrace() {
-    const stored = Number(localStorage.getItem(LS_ACTIVITY) || 0);
-    return stored > 0 && now() - stored < INACTIVITY_MS;
-  }
-
-  /** Start the 30s inactivity watchdog (also resets the clock). */
+  /** Start the foreground inactivity watchdog (also resets the clock). */
   function startInactivity() {
     lastActivity = now();
-    persistActivity();
     stopInactivity();
     inactivityInterval = setInterval(() => {
       if (unlocked && now() - lastActivity >= INACTIVITY_MS) lockNow();
-    }, 1000);
+    }, 5000);
   }
   function stopInactivity() {
     if (inactivityInterval) {
@@ -319,7 +290,6 @@
         <input id="s_conf" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
 
       <div class="settings-section-title">Security</div>
-      <p class="rec-small muted" style="margin:0 0 10px;">Auto-locks after 30 seconds of inactivity.</p>
       <div class="settings-bio">
         <span id="s_bioLabel" class="muted"></span>
         <button type="button" class="btn small hidden" id="s_bioBtn"></button>
@@ -477,7 +447,6 @@
   function lockNow() {
     unlocked = false;
     stopInactivity();
-    clearActivity(); // a real lock must survive a refresh
     showUnlock();
     setTimeout(() => $("pinEnter") && $("pinEnter").focus(), 50);
   }
@@ -485,13 +454,12 @@
   /* ---------------- Wire up ---------------- */
 
   function wire() {
-    // First run vs returning.
+    // Every fresh page load (first run, refresh, or reopen after the app was
+    // swiped from recents) starts locked. App-switching keeps the page alive,
+    // so it never reaches here — that's why switching doesn't lock.
     if (!hasPin()) {
       panel("lockSetup");
       show($("lockScreen"));
-    } else if (withinGrace()) {
-      // Refreshed/reopened within 30s of last use → skip the lock screen.
-      unlockApp();
     } else {
       showUnlock();
     }
@@ -644,33 +612,26 @@
     // Settings (single button: theme, PIN, biometrics, recovery, lock)
     $("settingsBtn").addEventListener("click", openSettings);
 
-    // Track interaction so we can lock after 30s of inactivity.
+    // Track interaction so we can lock after 5 min of foreground inactivity.
     ["pointerdown", "keydown", "click", "scroll", "touchstart"].forEach((ev) =>
       document.addEventListener(
         ev,
         () => {
-          if (unlocked) bumpActivity();
+          if (unlocked) lastActivity = now();
         },
         { passive: true }
       )
     );
 
-    // Persist the timestamp when leaving/closing so a reopen can honor the grace.
+    // Switching apps must NOT lock. Pause the timer while hidden and resume
+    // fresh on return — background time doesn't count as inactivity. A full
+    // close (swipe from recents) is a fresh page load, which locks via wire().
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        if (unlocked) persistActivity();
-        stopInactivity(); // timers are unreliable in the background
-      } else if (unlocked && hasPin()) {
-        // Returning: lock only if inactive (incl. time away) for >= 30s.
-        if (now() - lastActivity >= INACTIVITY_MS) {
-          lockNow();
-        } else {
-          startInactivity(); // resume with a fresh window
-        }
+        stopInactivity();
+      } else if (unlocked) {
+        startInactivity();
       }
-    });
-    window.addEventListener("pagehide", () => {
-      if (unlocked) persistActivity();
     });
   }
 
