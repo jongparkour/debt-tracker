@@ -11,20 +11,47 @@
   const LS_CRED = "dt_cred"; // base64 credential id for biometrics
   const LS_UID = "dt_uid"; // base64 WebAuthn user handle
   const LS_REC = "dt_rec"; // { salt, hash, iter } for the recovery code
-  const INACTIVITY_MS = 5 * 60 * 1000; // lock after 5 min of no interaction
+  const INACTIVITY_MS = 5 * 60 * 1000; // lock 5 min after last use
+  const LS_ACTIVITY = "dt_active"; // last-activity timestamp (persists reloads)
   const FEEDBACK_EMAIL = "libosadajosephy@gmail.com";
 
   let currentRecoveryCode = ""; // held only in memory while shown at setup
-  let lastActivity = 0; // timestamp of last user interaction (foreground)
+  let lastActivity = 0; // timestamp of last user interaction
+  let lastWrite = 0;
   let inactivityInterval = null;
 
   function now() {
     return new Date().getTime();
   }
 
-  /** Start the foreground inactivity watchdog (also resets the clock). */
+  /** Record activity; persist (throttled) so back/close/reload can remember it. */
+  function bumpActivity() {
+    lastActivity = now();
+    if (lastActivity - lastWrite > 3000) {
+      lastWrite = lastActivity;
+      persistActivity();
+    }
+  }
+  function persistActivity() {
+    try {
+      localStorage.setItem(LS_ACTIVITY, String(lastActivity));
+    } catch (e) {}
+  }
+  function clearActivity() {
+    try {
+      localStorage.removeItem(LS_ACTIVITY);
+    } catch (e) {}
+  }
+  /** True if last use (even before a reload) is within the 5-min window. */
+  function withinGrace() {
+    const stored = Number(localStorage.getItem(LS_ACTIVITY) || 0);
+    return stored > 0 && now() - stored < INACTIVITY_MS;
+  }
+
+  /** Start the inactivity watchdog (also resets & persists the clock). */
   function startInactivity() {
     lastActivity = now();
+    persistActivity();
     stopInactivity();
     inactivityInterval = setInterval(() => {
       if (unlocked && now() - lastActivity >= INACTIVITY_MS) lockNow();
@@ -447,6 +474,7 @@
   function lockNow() {
     unlocked = false;
     stopInactivity();
+    clearActivity(); // a deliberate/idle lock must survive a reload
     showUnlock();
     setTimeout(() => $("pinEnter") && $("pinEnter").focus(), 50);
   }
@@ -454,12 +482,14 @@
   /* ---------------- Wire up ---------------- */
 
   function wire() {
-    // Every fresh page load (first run, refresh, or reopen after the app was
-    // swiped from recents) starts locked. App-switching keeps the page alive,
-    // so it never reaches here — that's why switching doesn't lock.
+    // On a fresh load (first run, refresh, or reopen after back/swipe closed
+    // the app): unlock automatically if you used it within the last 5 min,
+    // otherwise require the PIN.
     if (!hasPin()) {
       panel("lockSetup");
       show($("lockScreen"));
+    } else if (withinGrace()) {
+      unlockApp();
     } else {
       showUnlock();
     }
@@ -612,26 +642,33 @@
     // Settings (single button: theme, PIN, biometrics, recovery, lock)
     $("settingsBtn").addEventListener("click", openSettings);
 
-    // Track interaction so we can lock after 5 min of foreground inactivity.
+    // Track interaction so we can lock after 5 min since last use.
     ["pointerdown", "keydown", "click", "scroll", "touchstart"].forEach((ev) =>
       document.addEventListener(
         ev,
         () => {
-          if (unlocked) lastActivity = now();
+          if (unlocked) bumpActivity();
         },
         { passive: true }
       )
     );
 
-    // Switching apps must NOT lock. Pause the timer while hidden and resume
-    // fresh on return — background time doesn't count as inactivity. A full
-    // close (swipe from recents) is a fresh page load, which locks via wire().
+    // Home/switch/back/close all just record the moment you left. On return
+    // (or a fresh load, via wire) we lock only if 5 min has elapsed.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
+        if (unlocked) persistActivity();
         stopInactivity();
-      } else if (unlocked) {
-        startInactivity();
+      } else if (unlocked && hasPin()) {
+        if (now() - lastActivity >= INACTIVITY_MS) {
+          lockNow();
+        } else {
+          startInactivity();
+        }
       }
+    });
+    window.addEventListener("pagehide", () => {
+      if (unlocked) persistActivity();
     });
   }
 
