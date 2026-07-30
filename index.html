@@ -18,6 +18,11 @@
       }
     })();
   </script>
+  <!-- iOS "Add to Home Screen": run fullscreen like a native app -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Debt Tracker" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/png" href="./icon-192.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
@@ -164,7 +169,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="site-footer">
-    Jongparkour · Debt Tracker v1.7
+    Jongparkour · Debt Tracker v1.8
   </footer>
 
   <script src="./db.js"></script>
