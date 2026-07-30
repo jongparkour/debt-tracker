@@ -266,9 +266,11 @@ input:focus, textarea:focus, select:focus {
   gap: 8px;
   margin-bottom: 10px;
 }
-.toolbar .search { flex: 1 1 auto; }
+.toolbar .search { flex: 1 1 0; min-width: 0; }
 .toolbar .filter {
   flex: 0 0 auto;
+  width: auto;
+  min-width: 130px;
   padding: 11px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
