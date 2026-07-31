@@ -353,11 +353,11 @@
 
       <div class="settings-section-title">Change PIN (4 digits)</div>
       <div class="field"><label>Current PIN</label>
-        <input id="s_cur" type="password" inputmode="numeric" autocomplete="off" /></div>
+        <input id="s_cur" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
       <div class="field"><label>New PIN</label>
-        <input id="s_new" type="password" inputmode="numeric" autocomplete="off" /></div>
+        <input id="s_new" type="password" inputmode="numeric" maxlength="4" autocomplete="off" /></div>
       <div class="field"><label>Confirm New PIN</label>
-        <input id="s_conf" type="password" inputmode="numeric" autocomplete="off" /></div>
+        <input id="s_conf" type="password" inputmode="numeric" maxlength="4" autocomplete="off" /></div>
 
       <div class="settings-section-title">Security</div>
       <div class="settings-bio">
@@ -400,11 +400,6 @@
         if (window.toast) toast("PIN changed.");
       }
     );
-
-    // Render the Change-PIN inputs as compact 4-box fields.
-    makePinField($("s_cur"), pinLen() || 4, true);
-    makePinField($("s_new"), 4, true);
-    makePinField($("s_conf"), 4, true);
 
     // Configure the biometric row based on device support + enrollment.
     const supported = await biometricSupported();
