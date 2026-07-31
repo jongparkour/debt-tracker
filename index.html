@@ -138,9 +138,10 @@
       </div>
 
       <div class="toolbar export-bar">
-        <button class="btn small" id="exportDebtorsBtn">⬇ Debtors CSV</button>
-        <button class="btn small" id="exportPaymentsBtn">⬇ Payments CSV</button>
+        <button class="btn small" id="exportBtn">⬇ Export data (CSV)</button>
+        <button class="btn small" id="importBtn">⬆ Import data (CSV)</button>
       </div>
+      <input type="file" id="importFile" accept=".csv,text/csv,text/plain" hidden />
 
       <div id="list" class="cards"></div>
       <p id="empty" class="empty hidden">No debtors yet. Add one above to get started.</p>
@@ -169,7 +170,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="site-footer">
-    Jongparkour · Debt Tracker v1.8
+    Jongparkour · Debt Tracker v1.9
   </footer>
 
   <script src="./db.js"></script>

@@ -257,6 +257,12 @@ input:focus, textarea:focus, select:focus {
 .btn.small { padding: 8px 11px; font-size: 0.82rem; }
 .btn.tiny { padding: 5px 9px; font-size: 0.75rem; }
 .btn.primary { width: auto; }
+
+/* Import dialogs: duplicate list + choice buttons */
+.dup-list { margin: 8px 0; padding-left: 20px; }
+.dup-list li { margin: 2px 0; }
+.choice-actions { display: flex; gap: 10px; margin-top: 16px; }
+.choice-actions .btn { flex: 1 1 auto; }
 #addDebtorBtn { width: 100%; }
 .back { margin-bottom: 12px; padding-left: 0; }
 

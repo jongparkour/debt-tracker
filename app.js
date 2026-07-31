@@ -526,6 +526,9 @@ function closeModal() {
   $("modalOverlay").classList.add("hidden");
   document.body.classList.remove("modal-open");
   $("modalBody").innerHTML = "";
+  // Restore the footer Save button to its default (dialogs above may hide/rename it).
+  $("modalSave").style.display = "";
+  $("modalSave").textContent = "Save";
   modalSaveHandler = null;
 }
 
@@ -683,69 +686,307 @@ function stamp() {
   ).padStart(2, "0")}`;
 }
 
-async function exportDebtorsCSV() {
-  const [debtors, payments] = await Promise.all([
-    DebtorsDB.getAll(),
-    PaymentsDB.getAll(),
-  ]);
-  if (!debtors.length) return toast("No debtors to export.");
+// One combined sheet: debtor info repeats on each of its payment rows, so a
+// debtor and its payments stay linked in a single spreadsheet.
+const DATA_HEADERS = [
+  "Debtor Name",
+  "Total Debt",
+  "Monthly Target",
+  "Payment Rule",
+  "Payment Date",
+  "Payment Amount",
+];
 
-  const rows = debtors.map((d) => {
-    const dp = payments.filter((p) => p.debtorId === d.id);
-    const { paid, remaining } = totals(d, dp);
-    return [
-      d.id,
-      d.name,
-      d.totalDebt,
-      paid,
-      remaining,
-      d.monthlyTarget || 0,
-      d.paymentRule || "",
-    ];
-  });
-
-  const csv = toCSV(
-    [
-      "id",
-      "name",
-      "totalDebt",
-      "totalPaid",
-      "remaining",
-      "monthlyTarget",
-      "paymentRule",
-    ],
-    rows
-  );
-  downloadCSV(`debtors-${stamp()}.csv`, csv);
-  toast("Debtors exported.");
+/** ISO timestamp -> "YYYY-MM-DD" using local date parts. */
+function isoDay(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 }
 
-async function exportPaymentsCSV() {
+async function exportDataCSV() {
   const [debtors, payments] = await Promise.all([
     DebtorsDB.getAll(),
     PaymentsDB.getAll(),
   ]);
-  if (!payments.length) return toast("No payments to export.");
+  if (!debtors.length) return toast("No data to export.");
 
-  const nameById = {};
-  debtors.forEach((d) => (nameById[d.id] = d.name));
+  // Group by name (same way the app displays people) so it round-trips.
+  const persons = buildPersons(debtors, payments);
+  const rows = [];
+  persons.forEach((p) => {
+    const rule = (p.loans.map((l) => l.paymentRule).find((r) => r && r.trim()) || "").trim();
+    const pays = [...p.payments].sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (pays.length) {
+      pays.forEach((pay) =>
+        rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, isoDay(pay.date), pay.amount])
+      );
+    } else {
+      rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, "", ""]);
+    }
+  });
 
-  const sorted = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const rows = sorted.map((p) => [
-    p.id,
-    p.debtorId,
-    nameById[p.debtorId] || "(deleted)",
-    p.amount,
-    p.date,
-    fmtDate(p.date),
-  ]);
+  downloadCSV(`debt-tracker-${stamp()}.csv`, toCSV(DATA_HEADERS, rows));
+  toast("Data exported.");
+}
 
-  const csv = toCSV(
-    ["paymentId", "debtorId", "debtorName", "amount", "dateISO", "date"],
-    rows
+/* -------------------- CSV import -------------------- */
+
+/** Normalize a header label for matching: trim, lowercase, collapse spaces. */
+function normLabel(s) {
+  return String(s || "").replace(/^﻿/, "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Parse a number from a cell, ignoring ₱, commas and spaces. */
+function parseNum(v) {
+  const n = Number(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+
+/** Parse a date cell to an ISO string, or null if unreadable. */
+function parseDateISO(v) {
+  const s = String(v || "").trim();
+  if (!s) return null;
+  let d = new Date(s);
+  if (!isNaN(d)) return d.toISOString();
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (m) {
+    let y = m[3];
+    if (y.length === 2) y = "20" + y;
+    d = new Date(`${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`);
+    if (!isNaN(d)) return d.toISOString();
+  }
+  return null;
+}
+
+/** Minimal RFC-4180 CSV parser (handles quotes, commas and newlines in cells). */
+function parseCSV(text) {
+  const rows = [];
+  let row = [],
+    field = "",
+    i = 0,
+    q = false;
+  const s = String(text).replace(/^﻿/, "");
+  while (i < s.length) {
+    const c = s[i];
+    if (q) {
+      if (c === '"') {
+        if (s[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        q = false;
+        i++;
+        continue;
+      }
+      field += c;
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      q = true;
+      i++;
+      continue;
+    }
+    if (c === ",") {
+      row.push(field);
+      field = "";
+      i++;
+      continue;
+    }
+    if (c === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+      i++;
+      continue;
+    }
+    if (c === "\r") {
+      i++;
+      continue;
+    }
+    field += c;
+    i++;
+  }
+  row.push(field);
+  rows.push(row);
+  return rows;
+}
+
+/** Promise-based choice dialog (reuses the shared modal). Resolves the chosen
+ *  value, or null if cancelled. */
+function askChoice(title, bodyHtml, buttons) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      $("modalCancel").removeEventListener("click", onCancel);
+      $("modalOverlay").removeEventListener("click", onOverlay);
+      closeModal();
+      resolve(val);
+    };
+    const onCancel = () => finish(null);
+    const onOverlay = (e) => {
+      if (e.target.id === "modalOverlay") finish(null);
+    };
+    const btns = buttons
+      .map(
+        (b) =>
+          `<button class="btn ${b.cls || ""}" data-choice="${esc(b.value)}">${esc(
+            b.label
+          )}</button>`
+      )
+      .join("");
+    openModal(title, `${bodyHtml}<div class="choice-actions">${btns}</div>`, null);
+    $("modalSave").style.display = "none";
+    $("modalBody")
+      .querySelectorAll("[data-choice]")
+      .forEach((el) => el.addEventListener("click", () => finish(el.dataset.choice)));
+    $("modalCancel").addEventListener("click", onCancel);
+    $("modalOverlay").addEventListener("click", onOverlay);
+  });
+}
+
+/** Explain the required format when a file can't be read. */
+function showImportHelp(missing) {
+  const need = DATA_HEADERS.map((h) => `<li>${esc(h)}</li>`).join("");
+  openModal(
+    "Can't read this file",
+    `
+    <p class="muted">The file is missing required column${missing.length > 1 ? "s" : ""}:
+      <b>${missing.map(esc).join(", ")}</b>.</p>
+    <p class="muted" style="margin-top:10px;">The first row of your spreadsheet must include
+      these exact column labels:</p>
+    <ul class="dup-list">${need}</ul>
+    <p class="muted" style="margin-top:10px;">Easiest fix: tap <b>⬇ Export data</b> first to get a
+      correctly-formatted file, edit that, then re-upload it.</p>
+    `,
+    () => closeModal()
   );
-  downloadCSV(`payments-${stamp()}.csv`, csv);
-  toast("Payments exported.");
+  $("modalSave").textContent = "Got it";
+}
+
+async function importDataCSV(file) {
+  let text;
+  try {
+    text = await file.text();
+  } catch (e) {
+    return toast("Could not read that file.");
+  }
+  const raw = parseCSV(text).filter((r) => r.some((c) => String(c).trim() !== ""));
+  if (raw.length < 2) return showImportHelp(DATA_HEADERS);
+
+  const header = raw[0].map(normLabel);
+  const col = {};
+  header.forEach((h, i) => {
+    if (!(h in col)) col[h] = i;
+  });
+  const required = ["debtor name", "total debt", "payment date", "payment amount"];
+  const missing = required
+    .filter((r) => !(r in col))
+    .map((r) => DATA_HEADERS.find((h) => normLabel(h) === r) || r);
+  if (missing.length) return showImportHelp(missing);
+
+  const iName = col["debtor name"],
+    iDebt = col["total debt"],
+    iTarget = col["monthly target"],
+    iRule = col["payment rule"],
+    iPd = col["payment date"],
+    iPa = col["payment amount"];
+
+  const persons = new Map();
+  for (let r = 1; r < raw.length; r++) {
+    const row = raw[r];
+    const name = String(row[iName] || "").trim();
+    if (!name) continue;
+    const key = normName(name);
+    if (!persons.has(key)) {
+      persons.set(key, {
+        name,
+        totalDebt: parseNum(row[iDebt]),
+        monthlyTarget: iTarget != null ? parseNum(row[iTarget]) : 0,
+        paymentRule: iRule != null ? String(row[iRule] || "").trim() : "",
+        payments: [],
+      });
+    }
+    const pd = iPd != null ? row[iPd] : "";
+    const pa = iPa != null ? row[iPa] : "";
+    if (String(pd || "").trim() !== "" && String(pa || "").trim() !== "") {
+      const amt = parseNum(pa);
+      const iso = parseDateISO(pd);
+      if (amt > 0 && iso) persons.get(key).payments.push({ amount: amt, date: iso });
+    }
+  }
+
+  const imported = Array.from(persons.values());
+  if (!imported.length) return toast("No debtor rows found in the file.");
+
+  const existing = await DebtorsDB.getAll();
+  const existingByName = new Map();
+  existing.forEach((d) => {
+    const k = normName(d.name);
+    if (!existingByName.has(k)) existingByName.set(k, []);
+    existingByName.get(k).push(d);
+  });
+  const dups = imported.filter((p) => existingByName.has(normName(p.name)));
+
+  let mode = "add";
+  if (dups.length) {
+    const names = dups.map((p) => p.name);
+    const shown = names.slice(0, 8).map((n) => `<li>${esc(n)}</li>`).join("");
+    const more = names.length > 8 ? `<li>…and ${names.length - 8} more</li>` : "";
+    const choice = await askChoice(
+      "Duplicate debtors found",
+      `
+      <p class="muted">${names.length} name${names.length !== 1 ? "s" : ""} in this file already
+        exist in the app:</p>
+      <ul class="dup-list">${shown}${more}</ul>
+      <p class="muted" style="margin-top:10px;">Keep both copies, or replace the existing ones with
+        the imported data?</p>
+      `,
+      [
+        { value: "keepboth", label: "Keep both" },
+        { value: "replace", label: "Replace existing", cls: "danger" },
+      ]
+    );
+    if (choice === null) return toast("Import cancelled.");
+    mode = choice;
+  }
+
+  let dCount = 0,
+    pCount = 0;
+  for (const p of imported) {
+    const key = normName(p.name);
+    if (mode === "replace" && existingByName.has(key)) {
+      for (const ex of existingByName.get(key)) {
+        await PaymentsDB.deleteByDebtor(ex.id);
+        await DebtorsDB.delete(ex.id);
+      }
+    }
+    const newId = await DebtorsDB.add({
+      name: p.name,
+      totalDebt: p.totalDebt,
+      paymentRule: p.paymentRule,
+      monthlyTarget: p.monthlyTarget,
+    });
+    dCount++;
+    for (const pay of p.payments) {
+      await PaymentsDB.add({ debtorId: Number(newId), amount: pay.amount, date: pay.date });
+      pCount++;
+    }
+  }
+
+  await loadDebtors();
+  toast(
+    `Imported ${dCount} debtor${dCount !== 1 ? "s" : ""}, ${pCount} payment${
+      pCount !== 1 ? "s" : ""
+    }.`
+  );
 }
 
 /* -------------------- Event wiring -------------------- */
@@ -763,9 +1004,14 @@ $("filter").addEventListener("change", (e) => {
   loadDebtors();
 });
 
-// CSV export
-$("exportDebtorsBtn").addEventListener("click", exportDebtorsCSV);
-$("exportPaymentsBtn").addEventListener("click", exportPaymentsCSV);
+// CSV export / import
+$("exportBtn").addEventListener("click", exportDataCSV);
+$("importBtn").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) importDataCSV(f);
+  e.target.value = ""; // allow re-selecting the same file
+});
 
 // Back button
 $("backBtn").addEventListener("click", showList);
@@ -852,7 +1098,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "1.8";
+const APP_VERSION = "1.9";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
