@@ -1,49 +1,66 @@
-/* ===== Dark theme = default (current design) ===== */
+/* ===== Dark theme = default (navy / teal redesign) ===== */
 :root {
-  --bg: #0b1220;
-  --card: #131c2e;
+  --bg: #080d1a;
+  --card: #121a2d;
   --ink: #e2e8f0;
   --muted: #94a3b8;
-  --line: #24314a;
-  --input-bg: #0e1626;
-  --btn-bg: #1b2740;
-  --subtle-bg: #0e1626;
-  --pill-bg: #78350f;
-  --pill-ink: #fde68a;
-  --pill-paid-bg: #14532d;
-  --pill-paid-ink: #86efac;
-  --danger-border: #7f1d1d;
+  --line: #1e293b;
+  --input-bg: #0b1120;
+  --btn-bg: #0b1120;
+  --subtle-bg: #0b1120;
+  --pill-bg: rgba(245, 158, 11, 0.12);
+  --pill-ink: #fbbf24;
+  --pill-paid-bg: rgba(20, 184, 166, 0.12);
+  --pill-paid-ink: #5eead4;
+  --pill-active-bg: rgba(16, 185, 129, 0.12);
+  --pill-active-ink: #34d399;
+  --pill-over-bg: rgba(244, 63, 94, 0.12);
+  --pill-over-ink: #fb7185;
+  --danger-border: rgba(244, 63, 94, 0.35);
 
-  --brand: #14a89b;
+  --brand: #0d9488;        /* teal-600 header */
+  --brand-hover: #0f766e;
   --brand-ink: #ffffff;
-  --danger: #f87171;
+  --accent: #10b981;       /* emerald primary */
+  --accent-hover: #059669;
+  --accent-ink: #052e16;
+  --danger: #fb7185;
   --ok: #34d399;
   --warn: #fbbf24;
-  --radius: 14px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
 }
 
 /* ===== Light theme (opt-in via toggle) ===== */
 :root[data-theme="light"] {
-  --bg: #f1f5f9;
+  --bg: #eef2f7;
   --card: #ffffff;
   --ink: #0f172a;
   --muted: #64748b;
   --line: #e2e8f0;
-  --input-bg: #ffffff;
+  --input-bg: #f8fafc;
   --btn-bg: #ffffff;
   --subtle-bg: #f8fafc;
   --pill-bg: #fef3c7;
   --pill-ink: #92400e;
-  --pill-paid-bg: #dcfce7;
-  --pill-paid-ink: #16a34a;
+  --pill-paid-bg: #ccfbf1;
+  --pill-paid-ink: #0f766e;
+  --pill-active-bg: #d1fae5;
+  --pill-active-ink: #047857;
+  --pill-over-bg: #ffe4e6;
+  --pill-over-ink: #be123c;
   --danger-border: #fecaca;
 
-  --brand: #0f766e;
+  --brand: #0d9488;
+  --brand-hover: #0f766e;
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --accent-ink: #052e16;
   --danger: #dc2626;
   --ok: #16a34a;
   --warn: #b45309;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
 }
 
 * { box-sizing: border-box; }
@@ -72,7 +89,20 @@ body {
   gap: 10px;
   box-shadow: var(--shadow);
 }
-.app-bar h1 { font-size: 1.25rem; margin: 0; }
+.app-bar .app-bar-title { display: flex; flex-direction: column; line-height: 1.1; }
+.app-bar h1 { font-size: 1.2rem; margin: 0; letter-spacing: -0.01em; }
+.app-bar .app-bar-sub {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 500;
+}
+.app-bar .brand-mark {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 11px;
+  font-size: 1.1rem;
+}
 
 .app-bar-right {
   margin-left: auto;
@@ -116,14 +146,25 @@ body {
 .lock-box {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 28px 22px;
+  border-radius: 22px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+  padding: 30px 24px;
   width: 100%;
   max-width: 360px;
   text-align: center;
 }
-.lock-logo { font-size: 2.6rem; margin-bottom: 6px; }
+.lock-logo {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  background: var(--brand);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px -8px rgba(13, 148, 136, 0.6);
+}
 .lock-box h2 { margin: 0 0 6px; font-size: 1.2rem; }
 .lock-box .muted { font-size: 0.85rem; margin: 0 0 16px; }
 .lock-box input {
@@ -140,6 +181,47 @@ body {
   color: var(--danger);
 }
 .lock-msg.ok { color: var(--ok); }
+
+/* ---------- 4-box PIN input ---------- */
+.pin-field { position: relative; margin: 4px 0 14px; }
+.pin-field > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  z-index: 2;
+  cursor: pointer;
+  margin: 0;
+  letter-spacing: normal;
+  font-size: 16px; /* avoid iOS zoom on focus */
+}
+.pin-boxes {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.pin-box {
+  width: 54px;
+  height: 62px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--input-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.pin-box.filled { border-color: var(--accent); }
+.pin-box.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+}
+.pin-field.compact .pin-box { width: 44px; height: 50px; font-size: 1.5rem; border-radius: 11px; }
+.pin-field.compact .pin-boxes { gap: 8px; justify-content: flex-start; }
 
 @keyframes shake {
   10%, 90% { transform: translateX(-2px); }
@@ -199,12 +281,66 @@ body {
 
 .panel {
   background: var(--card);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 18px;
   box-shadow: var(--shadow);
   margin-bottom: 22px;
 }
 .panel h2 { margin: 0 0 12px; font-size: 1.05rem; }
+
+/* Collapsible Add-Debtor card */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.panel-head h2 { margin: 0; }
+.mini-toggle {
+  background: var(--subtle-bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ---------- Dashboard metric tiles ---------- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+@media (min-width: 560px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+.tile {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 15px;
+  box-shadow: var(--shadow);
+}
+.tile .tile-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.tile .tile-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin: 4px 0 2px;
+  letter-spacing: -0.02em;
+}
+.tile .tile-sub { font-size: 0.62rem; color: var(--muted); }
+.tile.total .tile-value { color: var(--accent); }
+.tile.count .tile-value { color: var(--ink); }
+.tile.overdue .tile-value { color: var(--danger); }
+.tile.collected .tile-value { color: var(--pill-paid-ink); }
 
 .section-head {
   display: flex;
@@ -224,9 +360,9 @@ body {
 }
 input, textarea, select {
   width: 100%;
-  padding: 11px 12px;
+  padding: 12px 13px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   background: var(--input-bg);
   color: var(--ink);
@@ -243,19 +379,25 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid var(--line);
   background: var(--btn-bg);
   color: var(--ink);
-  padding: 10px 14px;
-  border-radius: 10px;
+  padding: 11px 15px;
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   cursor: pointer;
   font-weight: 600;
-  transition: filter 0.15s, background 0.15s;
+  transition: filter 0.15s, background 0.15s, transform 0.1s;
 }
-.btn:active { filter: brightness(0.95); }
-.btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.btn:active { transform: scale(0.98); filter: brightness(0.96); }
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  box-shadow: 0 8px 20px -8px rgba(16, 185, 129, 0.5);
+}
+.btn.primary:active { background: var(--accent-hover); }
 .btn.danger { color: var(--danger); border-color: var(--danger-border); }
 .btn.ghost { background: transparent; border-color: transparent; }
-.btn.small { padding: 8px 11px; font-size: 0.82rem; }
-.btn.tiny { padding: 5px 9px; font-size: 0.75rem; }
+.btn.small { padding: 9px 12px; font-size: 0.82rem; }
+.btn.tiny { padding: 6px 10px; font-size: 0.75rem; }
 .btn.primary { width: auto; }
 
 /* Import dialogs: duplicate list + choice buttons */
@@ -292,10 +434,14 @@ input:focus, textarea:focus, select:focus {
 
 .card {
   background: var(--card);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
+.card:hover { border-color: #2b3a55; }
 .card-head {
   display: flex;
   align-items: center;
@@ -303,18 +449,60 @@ input:focus, textarea:focus, select:focus {
   gap: 8px;
   margin-bottom: 12px;
 }
-.card-head h2, .card-head h3 { margin: 0; font-size: 1.1rem; }
+.card-head h2, .card-head h3 { margin: 0; font-size: 1.05rem; }
+.card-head h2 { cursor: default; }
 
 .pill {
   background: var(--pill-bg);
   color: var(--pill-ink);
-  padding: 4px 10px;
+  border: 1px solid transparent;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .pill.paid { background: var(--pill-paid-bg); color: var(--pill-paid-ink); }
+.pill.active { background: var(--pill-active-bg); color: var(--pill-active-ink); }
+.pill.overdue { background: var(--pill-over-bg); color: var(--pill-over-ink); }
+
+/* Card footer: remaining balance + actions */
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.remaining .rem-label {
+  display: block;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.remaining .rem-value { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
+.remaining .rem-value.settled { color: var(--muted); text-decoration: line-through; }
+.card-foot-actions { display: flex; align-items: center; gap: 8px; }
+.btn.pay-btn {
+  background: var(--pill-active-bg);
+  color: var(--pill-active-ink);
+  border-color: var(--pill-active-bg);
+  padding: 8px 13px;
+}
+.btn.icon-danger {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 7px;
+  font-size: 0.95rem;
+}
+.btn.icon-danger:active { color: var(--danger); }
 
 .stats {
   display: grid;
@@ -335,19 +523,31 @@ input:focus, textarea:focus, select:focus {
   padding: 8px 10px;
   border-radius: 8px;
 }
+/* Plain rule line on list cards */
+.card-rule { margin: 0 0 12px; font-size: 0.78rem; color: var(--muted); }
+.card-rule b { color: var(--ink); font-weight: 600; }
+.pin-label { display: block; text-align: left; font-size: 0.72rem; margin: 8px 2px 0; }
 
 .progress {
-  height: 7px;
-  background: var(--line);
+  height: 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
   border-radius: 999px;
   overflow: hidden;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 .progress span {
   display: block;
   height: 100%;
-  background: var(--brand);
-  transition: width 0.3s;
+  background: #2dd4bf;
+  transition: width 0.5s;
+}
+.paid-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.66rem;
+  color: var(--muted);
+  margin-bottom: 2px;
 }
 
 .card-actions {
@@ -407,7 +607,9 @@ input:focus, textarea:focus, select:focus {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(8, 13, 26, 0.8);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -419,12 +621,12 @@ input:focus, textarea:focus, select:focus {
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 22px;
   width: 100%;
   max-width: 420px;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
 }
 
 /* While any modal is open, prevent the page behind it from scrolling. */

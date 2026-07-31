@@ -211,17 +211,47 @@ async function deletePerson(repId) {
 
 /* -------------------- Payment CRUD -------------------- */
 
-async function addPayment(debtorId, amount) {
+async function addPayment(debtorId, amount, dateISO) {
   const amt = Number(amount);
   if (!(amt > 0)) return toast("Enter a valid payment amount.");
 
   await PaymentsDB.add({
     debtorId: Number(debtorId),
     amount: amt,
-    date: new Date().toISOString(),
+    date: dateISO || new Date().toISOString(),
   });
   toast("Payment recorded.");
   refreshCurrentView();
+}
+
+/** Popup to record a payment with a chosen amount + date. */
+function openPaymentModal(payToId, name) {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  openModal(
+    "Record Payment",
+    `
+    <p class="muted" style="margin:0 0 14px;color:var(--brand);font-weight:600;">${esc(
+      name || ""
+    )}</p>
+    <div class="field"><label>Payment Amount (₱)</label>
+      <input id="pm_amount" type="number" inputmode="decimal" min="0" placeholder="0.00" /></div>
+    <div class="field"><label>Payment Date</label>
+      <input id="pm_date" type="date" value="${yyyy}-${mm}-${dd}" /></div>
+    `,
+    async () => {
+      const amt = Number($("pm_amount").value);
+      if (!(amt > 0)) return ($("pm_amount").focus());
+      const dv = $("pm_date").value;
+      const iso = dv ? new Date(dv + "T00:00:00").toISOString() : new Date().toISOString();
+      closeModal();
+      await addPayment(payToId, amt, iso);
+    }
+  );
+  $("modalSave").textContent = "Submit Payment";
+  setTimeout(() => $("pm_amount") && $("pm_amount").focus(), 60);
 }
 
 async function deletePayment(paymentId) {
@@ -273,38 +303,51 @@ async function loadDebtors(animateCards = false) {
     !(persons.length > 0 && visible.length === 0)
   );
 
-  let grandRemaining = 0;
-
-  visible.forEach((p, i) => {
-    grandRemaining += p.remaining;
-
-    // Rule text: show each loan's rule if any exist.
-    const rules = p.loans.map((l) => l.paymentRule).filter(Boolean);
-    const ruleText = rules.length ? rules.join(" · ") : "";
-
-    // This-month expected vs paid.
-    const monthPaid = p.payments
+  // ----- Dashboard tiles (computed across ALL people, not the filtered view) -----
+  let outstanding = 0,
+    activeCount = 0,
+    overdueCount = 0,
+    collected = 0;
+  const isOverdue = (p) => {
+    if (p.remaining <= 0 || !(p.monthlyTarget > 0)) return false;
+    const mPaid = p.payments
       .filter((x) => monthOf(x.date).key === monthKey)
       .reduce((s, x) => s + Number(x.amount || 0), 0);
-    let monthHtml = "";
-    if (p.monthlyTarget > 0) {
-      const met = monthPaid >= p.monthlyTarget;
-      monthHtml = `
-        <div class="this-month">
-          <span class="mt-label">This month</span>
-          <span>${peso(monthPaid)} / ${peso(p.monthlyTarget)}
-            <span class="month-status ${met ? "met" : "short"}">${
-        met ? "met" : peso(p.monthlyTarget - monthPaid) + " to go"
-      }</span>
-          </span>
-        </div>`;
+    return mPaid < p.monthlyTarget;
+  };
+  persons.forEach((p) => {
+    collected += p.paid;
+    if (p.remaining > 0) {
+      outstanding += p.remaining;
+      activeCount++;
+      if (isOverdue(p)) overdueCount++;
     }
+  });
+  if ($("statTotalDebt")) $("statTotalDebt").textContent = peso(outstanding);
+  if ($("statDebtors")) $("statDebtors").textContent = activeCount;
+  if ($("statOverdue")) $("statOverdue").textContent = overdueCount;
+  if ($("statCollected")) $("statCollected").textContent = peso(collected);
+
+  visible.forEach((p, i) => {
+    const rules = p.loans.map((l) => l.paymentRule).filter(Boolean);
+    const ruleText = rules.length ? rules.join(" · ") : "";
+    const settled = p.remaining <= 0;
+    const overdue = isOverdue(p);
+
+    const status = settled
+      ? { cls: "paid", txt: "Paid Off" }
+      : overdue
+      ? { cls: "overdue", txt: "Overdue" }
+      : { cls: "active", txt: "Active" };
 
     const loanCount =
       p.loans.length > 1 ? ` <span class="muted">(${p.loans.length} debts)</span>` : "";
+    const progress = Math.round(pct(p.paid, p.totalDebt));
 
     const card = document.createElement("div");
     card.className = "card";
+    card.dataset.act = "view";
+    card.dataset.id = p.payToId;
     if (animateCards) {
       card.classList.add("enter");
       card.style.animationDelay = Math.min(i, 8) * 45 + "ms";
@@ -312,23 +355,31 @@ async function loadDebtors(animateCards = false) {
     card.innerHTML = `
       <div class="card-head">
         <h3>${esc(p.name)}${loanCount}</h3>
-        <span class="pill ${p.remaining <= 0 ? "paid" : ""}">
-          ${p.remaining <= 0 ? "Settled" : peso(p.remaining) + " left"}
-        </span>
+        <span class="pill ${status.cls}">${status.txt}</span>
       </div>
-      <div class="stats">
-        <div><span class="muted">Total</span><b>${peso(p.totalDebt)}</b></div>
-        <div><span class="muted">Paid</span><b>${peso(p.paid)}</b></div>
-      </div>
-      ${monthHtml}
-      ${ruleText ? `<p class="rule">📋 ${esc(ruleText)}</p>` : ""}
+      <p class="card-rule">Rule: <b>${ruleText ? esc(ruleText) : "—"}</b>${
+      p.monthlyTarget > 0 ? ` · Expected <b>${peso(p.monthlyTarget)}</b>/mo` : ""
+    }</p>
       <div class="progress"><span style="width:${pct(p.paid, p.totalDebt)}%"></span></div>
-      <div class="card-actions">
-        <input type="number" inputmode="decimal" min="0" placeholder="Amount"
-               class="pay-input" data-id="${p.payToId}" />
-        <button class="btn small primary" data-act="pay" data-id="${p.payToId}">Add Payment</button>
-        <button class="btn small" data-act="view" data-id="${p.payToId}">View</button>
-        <button class="btn small danger" data-act="delperson" data-id="${p.payToId}">Delete</button>
+      <div class="paid-row">
+        <span>Paid: ${peso(p.paid)} (${progress}%)</span>
+        <span>Total: ${peso(p.totalDebt)}</span>
+      </div>
+      <div class="card-foot">
+        <div class="remaining">
+          <span class="rem-label">Remaining Balance</span>
+          <span class="rem-value ${settled ? "settled" : ""}">${peso(Math.max(0, p.remaining))}</span>
+        </div>
+        <div class="card-foot-actions">
+          ${
+            settled
+              ? `<span class="pill paid">Settled</span>`
+              : `<button class="btn pay-btn" data-act="paymodal" data-id="${p.payToId}" data-name="${esc(
+                  p.name
+                )}">+ Pay</button>`
+          }
+          <button class="btn icon-danger" data-act="delperson" data-id="${p.payToId}" title="Delete">🗑</button>
+        </div>
       </div>
     `;
     list.appendChild(card);
@@ -339,7 +390,7 @@ async function loadDebtors(animateCards = false) {
   $("summary").textContent = persons.length
     ? `${filtered ? shown + " of " + persons.length : persons.length} ${
         persons.length > 1 ? "people" : "person"
-      } · ${peso(grandRemaining)} outstanding`
+      } · ${peso(outstanding)} outstanding`
     : "";
 }
 
@@ -486,9 +537,8 @@ async function showDetail(repId) {
       )}%"></span></div>
 
       <div class="add-pay">
-        <input type="number" inputmode="decimal" min="0" placeholder="Payment amount"
-               class="pay-input" id="detailPayInput" data-id="${person.payToId}" />
-        <button class="btn primary" data-act="pay" data-id="${person.payToId}">Add Payment</button>
+        <button class="btn primary" data-act="paymodal" data-id="${person.payToId}"
+                data-name="${esc(person.name)}" style="width:100%;">+ Record Payment</button>
       </div>
     </div>
 
@@ -994,6 +1044,13 @@ async function importDataCSV(file) {
 // Add-debtor button
 $("addDebtorBtn").addEventListener("click", addDebtor);
 
+// Collapsible Add-Debtor card
+$("addToggleBtn").addEventListener("click", () => {
+  const body = $("addDebtorBody");
+  const hidden = body.classList.toggle("hidden");
+  $("addToggleBtn").textContent = hidden ? "Expand" : "Minimize";
+});
+
 // Search + filter
 $("search").addEventListener("input", (e) => {
   searchTerm = e.target.value;
@@ -1045,6 +1102,9 @@ document.body.addEventListener("click", (e) => {
       });
       break;
     }
+    case "paymodal":
+      openPaymentModal(id, btn.dataset.name || "");
+      break;
     case "view":
       showDetail(id);
       break;
@@ -1098,7 +1158,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "1.9.1";
+const APP_VERSION = "2.0";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

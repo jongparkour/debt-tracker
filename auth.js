@@ -271,6 +271,49 @@
     box.classList.add("shake");
   }
 
+  /** Turn a text/number input into a segmented N-box PIN display.
+   *  The real input is kept (transparent overlay) so all existing logic that
+   *  reads its .value keeps working; boxes just visualize the digits. */
+  function makePinField(input, digits, compact) {
+    if (!input || input.dataset.pinified) return;
+    input.dataset.pinified = "1";
+    input.maxLength = digits;
+    input.setAttribute("inputmode", "numeric");
+    input.setAttribute("autocomplete", "off");
+
+    const wrap = document.createElement("div");
+    wrap.className = "pin-field" + (compact ? " compact" : "");
+    input.parentNode.insertBefore(wrap, input);
+
+    const boxes = document.createElement("div");
+    boxes.className = "pin-boxes";
+    for (let i = 0; i < digits; i++) {
+      const b = document.createElement("div");
+      b.className = "pin-box";
+      boxes.appendChild(b);
+    }
+    wrap.appendChild(boxes);
+    wrap.appendChild(input); // overlays the boxes (absolute, transparent)
+
+    const render = () => {
+      const v = input.value.replace(/\D/g, "").slice(0, digits);
+      if (v !== input.value) input.value = v;
+      const focused = document.activeElement === input;
+      for (let i = 0; i < boxes.children.length; i++) {
+        const cell = boxes.children[i];
+        const filled = i < v.length;
+        cell.textContent = filled ? "•" : "";
+        cell.classList.toggle("filled", filled);
+        cell.classList.toggle("active", focused && i === v.length);
+      }
+    };
+    input.addEventListener("input", render);
+    input.addEventListener("focus", render);
+    input.addEventListener("blur", render);
+    wrap.addEventListener("click", () => input.focus());
+    render();
+  }
+
   function unlockApp() {
     unlocked = true;
     hide($("lockScreen"));
@@ -308,13 +351,13 @@
         <button type="button" class="btn small" id="s_themeLight">☀️ Light</button>
       </div>
 
-      <div class="settings-section-title">Change PIN</div>
+      <div class="settings-section-title">Change PIN (4 digits)</div>
       <div class="field"><label>Current PIN</label>
-        <input id="s_cur" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
-      <div class="field"><label>New PIN (4–8 digits)</label>
-        <input id="s_new" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
+        <input id="s_cur" type="password" inputmode="numeric" autocomplete="off" /></div>
+      <div class="field"><label>New PIN</label>
+        <input id="s_new" type="password" inputmode="numeric" autocomplete="off" /></div>
       <div class="field"><label>Confirm New PIN</label>
-        <input id="s_conf" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
+        <input id="s_conf" type="password" inputmode="numeric" autocomplete="off" /></div>
 
       <div class="settings-section-title">Security</div>
       <div class="settings-bio">
@@ -347,8 +390,8 @@
 
         if (!(await verifyPin(cur)))
           return ($("s_msg").textContent = "Current PIN is incorrect.");
-        if (!/^\d{4,8}$/.test(nw))
-          return ($("s_msg").textContent = "New PIN must be 4–8 digits.");
+        if (!/^\d{4}$/.test(nw))
+          return ($("s_msg").textContent = "New PIN must be exactly 4 digits.");
         if (nw !== cf)
           return ($("s_msg").textContent = "New PINs don't match.");
 
@@ -357,6 +400,11 @@
         if (window.toast) toast("PIN changed.");
       }
     );
+
+    // Render the Change-PIN inputs as compact 4-box fields.
+    makePinField($("s_cur"), pinLen() || 4, true);
+    makePinField($("s_new"), 4, true);
+    makePinField($("s_conf"), 4, true);
 
     // Configure the biometric row based on device support + enrollment.
     const supported = await biometricSupported();
@@ -494,6 +542,11 @@
       showUnlock();
     }
 
+    // Render PIN inputs as 4 boxes (unlock uses the stored length for older PINs).
+    makePinField($("pinNew"), 4);
+    makePinField($("pinConfirm"), 4);
+    makePinField($("pinEnter"), pinLen() || 4);
+
     // Shared: after a PIN is (re)set, offer biometrics then open the app.
     async function afterPinSet() {
       if ((await biometricSupported()) && !biometricEnrolled()) {
@@ -508,8 +561,8 @@
     $("pinSetBtn").addEventListener("click", async () => {
       const a = $("pinNew").value.trim();
       const b = $("pinConfirm").value.trim();
-      if (!/^\d{4,8}$/.test(a))
-        return msg($("lockSetupMsg"), "PIN must be 4–8 digits.");
+      if (!/^\d{4}$/.test(a))
+        return msg($("lockSetupMsg"), "PIN must be exactly 4 digits.");
       if (a !== b) return msg($("lockSetupMsg"), "PINs don't match.");
 
       await setPin(a);
