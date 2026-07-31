@@ -863,7 +863,7 @@ function showImportHelp(missing) {
     <p class="muted" style="margin-top:10px;">The first row of your spreadsheet must include
       these exact column labels:</p>
     <ul class="dup-list">${need}</ul>
-    <p class="muted" style="margin-top:10px;">Easiest fix: tap <b>⬇ Export data</b> first to get a
+    <p class="muted" style="margin-top:10px;">Tip: tap <b>⬇ Export data</b> first to get a
       correctly-formatted file, edit that, then re-upload it.</p>
     `,
     () => closeModal()
@@ -1098,7 +1098,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "1.9";
+const APP_VERSION = "1.9.1";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
