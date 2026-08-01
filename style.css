@@ -154,16 +154,9 @@ body {
   text-align: center;
 }
 .lock-logo {
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  background: var(--brand);
-  border-radius: 18px;
-  box-shadow: 0 10px 24px -8px rgba(13, 148, 136, 0.6);
+  font-size: 2.8rem;
+  line-height: 1;
+  margin: 0 auto 10px;
 }
 .lock-box h2 { margin: 0 0 6px; font-size: 1.2rem; }
 .lock-box .muted { font-size: 0.85rem; margin: 0 0 16px; }
