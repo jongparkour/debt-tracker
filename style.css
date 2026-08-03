@@ -215,6 +215,13 @@ body {
 }
 .pin-field.compact .pin-box { width: 44px; height: 50px; font-size: 1.5rem; border-radius: 11px; }
 .pin-field.compact .pin-boxes { gap: 8px; justify-content: flex-start; }
+/* Wrong-PIN flash: every box turns red, dots included. */
+.pin-field.error .pin-box {
+  border-color: var(--danger);
+  background: rgba(244, 63, 94, 0.14);
+  color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.14);
+}
 
 @keyframes shake {
   10%, 90% { transform: translateX(-2px); }

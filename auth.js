@@ -643,7 +643,7 @@
 
     // --- Unlock panel ---
     let pinChecking = false;
-    async function tryPin(silent) {
+    async function tryPin() {
       if (pinChecking) return;
       const pin = $("pinEnter").value.trim();
       if (!pin) return;
@@ -657,24 +657,38 @@
             localStorage.setItem(LS_PIN, JSON.stringify(rec));
           }
           unlockApp();
-        } else if (!silent) {
-          msg($("lockUnlockMsg"), "Wrong PIN. Try again.");
-          $("pinEnter").value = "";
-          shake();
+        } else {
+          wrongPin();
         }
       } finally {
         pinChecking = false;
       }
     }
-    $("pinUnlockBtn").addEventListener("click", () => tryPin(false));
+
+    // Flash the boxes red, then empty them so the user can retry immediately.
+    function wrongPin() {
+      const el = $("pinEnter");
+      const wrap = el.closest(".pin-field");
+      msg($("lockUnlockMsg"), "Wrong PIN. Try again.");
+      if (wrap) wrap.classList.add("error");
+      shake();
+      setTimeout(() => {
+        el.value = "";
+        el.dispatchEvent(new Event("input")); // re-render the boxes empty
+        if (wrap) wrap.classList.remove("error");
+        el.focus();
+      }, 600);
+    }
+
+    $("pinUnlockBtn").addEventListener("click", () => tryPin());
     $("pinEnter").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") tryPin(false);
+      if (e.key === "Enter") tryPin();
     });
-    // Auto-unlock: check as soon as the PIN reaches its known length.
+    // Auto-check the moment the PIN reaches its known length.
     $("pinEnter").addEventListener("input", () => {
       const len = pinLen();
       const val = $("pinEnter").value.trim();
-      if (len && val.length === len) tryPin(true);
+      if (len && val.length === len) tryPin();
     });
 
     $("bioUnlockBtn").addEventListener("click", async () => {
