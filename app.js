@@ -73,9 +73,9 @@ function toast(msg) {
 
 function getTheme() {
   try {
-    return localStorage.getItem("dt_theme") || "dark";
+    return localStorage.getItem("dt_theme") || "light";
   } catch (e) {
-    return "dark";
+    return "light";
   }
 }
 function applyTheme(t) {
@@ -84,9 +84,9 @@ function applyTheme(t) {
   try {
     localStorage.setItem("dt_theme", theme);
   } catch (e) {}
-  // Keep the mobile status-bar matched to the teal app bar in both themes.
+  // Keep the mobile status-bar matched to the page background in both themes.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "light" ? "#0f766e" : "#14a89b");
+  if (meta) meta.setAttribute("content", theme === "light" ? "#eef2f7" : "#080d1a");
 }
 function toggleTheme() {
   const next = getTheme() === "light" ? "dark" : "light";
@@ -138,6 +138,10 @@ function buildPersons(debtors, allPayments) {
     p.remaining = p.totalDebt - p.paid;
     // Payment attaches to the first loan record for this person.
     p.payToId = p.loans[0].id;
+    // Earliest due date across this person's loans; notes joined.
+    const dues = p.loans.map((l) => l.dueDate).filter(Boolean).sort();
+    p.dueDate = dues[0] || "";
+    p.note = p.loans.map((l) => l.note).filter(Boolean).join(" · ");
   });
   // Sort: unsettled first, then by name.
   persons.sort((a, b) => {
@@ -151,23 +155,50 @@ function buildPersons(debtors, allPayments) {
 
 /* -------------------- Debtor CRUD -------------------- */
 
-async function addDebtor() {
-  const name = $("name").value.trim();
-  const totalDebt = Number($("debt").value);
-  const paymentRule = $("rule").value.trim();
-  const monthlyTarget = Number($("target").value) || 0;
+/** Open the Add-debtor modal: Name, Amount, Due date, Note, + optional rule/target. */
+function openAddDebtor() {
+  openModal(
+    "Add debtor",
+    `
+    <p class="muted modal-intro">Record who owes you and how much.</p>
+    <div class="field"><label>Name</label>
+      <input id="a_name" placeholder="e.g. Juan Dela Cruz" /></div>
+    <div class="field"><label>Amount owed (₱)</label>
+      <input id="a_debt" type="number" inputmode="decimal" min="0" placeholder="0.00" /></div>
+    <div class="field-row">
+      <div class="field"><label>Due date</label>
+        <input id="a_due" type="date" /></div>
+      <div class="field"><label>Note</label>
+        <input id="a_note" placeholder="optional" /></div>
+    </div>
+    <details class="more-fields">
+      <summary>More options</summary>
+      <div class="field"><label>Payment rule</label>
+        <input id="a_rule" placeholder="e.g. ₱300 / day" /></div>
+      <div class="field"><label>Expected monthly payment (₱)</label>
+        <input id="a_target" type="number" inputmode="decimal" min="0" placeholder="e.g. 2000" /></div>
+    </details>
+  `,
+    async () => {
+      const name = $("a_name").value.trim();
+      const totalDebt = Number($("a_debt").value);
+      if (!name) return toast("Please enter a name.");
+      if (!(totalDebt > 0)) return toast("Enter a valid amount owed.");
 
-  if (!name) return toast("Please enter a name.");
-  if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
+      const dueVal = $("a_due").value;
+      const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
+      const note = $("a_note").value.trim();
+      const paymentRule = $("a_rule") ? $("a_rule").value.trim() : "";
+      const monthlyTarget = $("a_target") ? Number($("a_target").value) || 0 : 0;
 
-  await DebtorsDB.add({ name, totalDebt, paymentRule, monthlyTarget });
-
-  $("name").value = "";
-  $("debt").value = "";
-  $("rule").value = "";
-  $("target").value = "";
-  toast("Saved. Same names are grouped together.");
-  loadDebtors(true);
+      await DebtorsDB.add({ name, totalDebt, paymentRule, monthlyTarget, dueDate, note });
+      closeModal();
+      toast("Debtor added.");
+      loadDebtors(true);
+    }
+  );
+  $("modalSave").textContent = "+ Add debtor";
+  setTimeout(() => $("a_name") && $("a_name").focus(), 60);
 }
 
 /** Delete a single debt entry (loan) and its payments. */
@@ -282,7 +313,6 @@ async function loadDebtors(animateCards = false) {
   ]);
 
   const persons = buildPersons(debtors, allPayments);
-  const monthKey = currentMonthKey();
 
   const list = $("list");
   list.innerHTML = "";
@@ -303,49 +333,53 @@ async function loadDebtors(animateCards = false) {
     !(persons.length > 0 && visible.length === 0)
   );
 
-  // ----- Dashboard tiles (computed across ALL people, not the filtered view) -----
+  // ----- Dashboard: hero (outstanding + % collected) + secondary stats -----
   let outstanding = 0,
-    activeCount = 0,
-    overdueCount = 0,
-    collected = 0;
-  const isOverdue = (p) => {
-    if (p.remaining <= 0 || !(p.monthlyTarget > 0)) return false;
-    const mPaid = p.payments
-      .filter((x) => monthOf(x.date).key === monthKey)
-      .reduce((s, x) => s + Number(x.amount || 0), 0);
-    return mPaid < p.monthlyTarget;
-  };
+    totalAll = 0,
+    collected = 0,
+    paidFull = 0;
   persons.forEach((p) => {
+    totalAll += p.totalDebt;
     collected += p.paid;
-    if (p.remaining > 0) {
-      outstanding += p.remaining;
-      activeCount++;
-      if (isOverdue(p)) overdueCount++;
-    }
+    if (p.remaining > 0) outstanding += p.remaining;
+    else paidFull++;
   });
-  if ($("statTotalDebt")) $("statTotalDebt").textContent = peso(outstanding);
-  if ($("statDebtors")) $("statDebtors").textContent = activeCount;
-  if ($("statOverdue")) $("statOverdue").textContent = overdueCount;
+  const collectedPct = totalAll > 0 ? Math.round((collected / totalAll) * 100) : 0;
+  if ($("statOutstanding")) $("statOutstanding").textContent = peso(outstanding);
+  if ($("heroBar")) $("heroBar").style.width = collectedPct + "%";
+  if ($("statCollectedPct")) $("statCollectedPct").textContent = collectedPct + "%";
   if ($("statCollected")) $("statCollected").textContent = peso(collected);
+  if ($("statDebtors")) $("statDebtors").textContent = persons.length;
+  if ($("statPaidFull")) $("statPaidFull").textContent = paidFull;
+
+  // Hide search/filter/export chrome entirely when there are no debtors at all.
+  if ($("listControls"))
+    $("listControls").classList.toggle("hidden", persons.length === 0);
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
   visible.forEach((p, i) => {
+    const settled = p.remaining <= 0;
     const rules = p.loans.map((l) => l.paymentRule).filter(Boolean);
     const ruleText = rules.length ? rules.join(" · ") : "";
-    const settled = p.remaining <= 0;
-    const overdue = isOverdue(p);
-
-    const status = settled
-      ? { cls: "paid", txt: "Paid Off" }
-      : overdue
-      ? { cls: "overdue", txt: "Overdue" }
-      : { cls: "active", txt: "Active" };
-
-    const loanCount =
-      p.loans.length > 1 ? ` <span class="muted">(${p.loans.length} debts)</span>` : "";
+    const overdue = !settled && p.dueDate && new Date(p.dueDate) < todayStart;
     const progress = Math.round(pct(p.paid, p.totalDebt));
+    const loanCount =
+      p.loans.length > 1 ? ` <span class="muted">· ${p.loans.length} debts</span>` : "";
+
+    // Meta chips (due date / rule) — only meaningful while a balance remains.
+    const meta = [];
+    if (!settled && p.dueDate)
+      meta.push(
+        `<span class="dcard-due${overdue ? " overdue" : ""}">📅 ${
+          overdue ? "Overdue · " : "Due "
+        }${fmtDate(p.dueDate)}</span>`
+      );
+    if (!settled && ruleText) meta.push(`<span class="dcard-rule">${esc(ruleText)}</span>`);
 
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "dcard" + (settled ? " is-paid" : "");
     card.dataset.act = "view";
     card.dataset.id = p.payToId;
     if (animateCards) {
@@ -353,33 +387,34 @@ async function loadDebtors(animateCards = false) {
       card.style.animationDelay = Math.min(i, 8) * 45 + "ms";
     }
     card.innerHTML = `
-      <div class="card-head">
-        <h3>${esc(p.name)}${loanCount}</h3>
-        <span class="pill ${status.cls}">${status.txt}</span>
+      <div class="dcard-top">
+        <h3 class="dcard-name">${esc(p.name)}${loanCount}</h3>
+        ${settled ? `<span class="badge-paid">Paid in full</span>` : ""}
       </div>
-      <p class="card-rule">Rule: <b>${ruleText ? esc(ruleText) : "—"}</b>${
-      p.monthlyTarget > 0 ? ` · Expected <b>${peso(p.monthlyTarget)}</b>/mo` : ""
-    }</p>
-      <div class="progress"><span style="width:${pct(p.paid, p.totalDebt)}%"></span></div>
-      <div class="paid-row">
-        <span>Paid: ${peso(p.paid)} (${progress}%)</span>
-        <span>Total: ${peso(p.totalDebt)}</span>
-      </div>
-      <div class="card-foot">
-        <div class="remaining">
-          <span class="rem-label">Remaining Balance</span>
-          <span class="rem-value ${settled ? "settled" : ""}">${peso(Math.max(0, p.remaining))}</span>
-        </div>
-        <div class="card-foot-actions">
-          ${
-            settled
-              ? `<span class="pill paid">Settled</span>`
-              : `<button class="btn pay-btn" data-act="paymodal" data-id="${p.payToId}" data-name="${esc(
-                  p.name
-                )}">+ Pay</button>`
-          }
-          <button class="btn icon-danger" data-act="delperson" data-id="${p.payToId}" title="Delete">🗑</button>
-        </div>
+      ${
+        settled
+          ? ""
+          : `<p class="dcard-amount">${peso(
+              p.remaining
+            )}<span class="dcard-amount-label">remaining</span></p>`
+      }
+      ${
+        !settled && p.paid > 0
+          ? `<div class="dcard-bar"><span style="width:${progress}%"></span></div>
+             <p class="dcard-sub">${peso(p.paid)} paid of ${peso(p.totalDebt)}</p>`
+          : ""
+      }
+      ${meta.length ? `<div class="dcard-meta">${meta.join("")}</div>` : ""}
+      ${p.note ? `<p class="dcard-note">“${esc(p.note)}”</p>` : ""}
+      <div class="dcard-actions">
+        ${
+          settled
+            ? ""
+            : `<button class="btn small primary" data-act="paymodal" data-id="${p.payToId}" data-name="${esc(
+                p.name
+              )}">+ Pay</button>`
+        }
+        <button class="btn small ghost" data-act="delperson" data-id="${p.payToId}">Delete</button>
       </div>
     `;
     list.appendChild(card);
@@ -518,6 +553,13 @@ async function showDetail(repId) {
       ? `<p class="rule">🎯 Expected monthly payment: <b>${peso(target)}</b></p>`
       : "";
 
+  const detailMeta = [];
+  if (person.dueDate) detailMeta.push(`📅 Due <b>${fmtDate(person.dueDate)}</b>`);
+  if (person.note) detailMeta.push(`📝 ${esc(person.note)}`);
+  const metaLine = detailMeta.length
+    ? `<p class="rule">${detailMeta.join(" &nbsp;·&nbsp; ")}</p>`
+    : "";
+
   $("detailContent").innerHTML = `
     <div class="card detail-card">
       <div class="card-head">
@@ -530,6 +572,7 @@ async function showDetail(repId) {
         <div><span class="muted">Total</span><b>${peso(person.totalDebt)}</b></div>
         <div><span class="muted">Paid</span><b>${peso(person.paid)}</b></div>
       </div>
+      ${metaLine}
       ${targetLine}
       <div class="progress"><span style="width:${pct(
         person.paid,
@@ -593,6 +636,12 @@ async function editDebtor(id) {
       <input id="m_name" value="${esc(d.name)}" /></div>
     <div class="field"><label>Total Debt (₱)</label>
       <input id="m_debt" type="number" min="0" value="${esc(d.totalDebt)}" /></div>
+    <div class="field-row">
+      <div class="field"><label>Due date</label>
+        <input id="m_due" type="date" value="${d.dueDate ? isoDay(d.dueDate) : ""}" /></div>
+      <div class="field"><label>Note</label>
+        <input id="m_note" value="${esc(d.note || "")}" placeholder="optional" /></div>
+    </div>
     <div class="field"><label>Payment Rule</label>
       <input id="m_rule" value="${esc(d.paymentRule || "")}" /></div>
     <div class="field"><label>Expected Monthly Payment (₱)</label>
@@ -606,10 +655,13 @@ async function editDebtor(id) {
       const totalDebt = Number($("m_debt").value);
       const paymentRule = $("m_rule").value.trim();
       const monthlyTarget = Number($("m_target").value) || 0;
+      const dueVal = $("m_due").value;
+      const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
+      const note = $("m_note").value.trim();
       if (!name) return toast("Name is required.");
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      await DebtorsDB.put({ ...d, name, totalDebt, paymentRule, monthlyTarget });
+      await DebtorsDB.put({ ...d, name, totalDebt, paymentRule, monthlyTarget, dueDate, note });
       closeModal();
       toast("Updated.");
       currentDetailKey = normName(name); // follow a possible rename
@@ -625,6 +677,12 @@ function addLoan(name) {
     `
     <div class="field"><label>Total Debt (₱)</label>
       <input id="m_debt" type="number" min="0" placeholder="0.00" /></div>
+    <div class="field-row">
+      <div class="field"><label>Due date</label>
+        <input id="m_due" type="date" /></div>
+      <div class="field"><label>Note</label>
+        <input id="m_note" placeholder="optional" /></div>
+    </div>
     <div class="field"><label>Payment Rule</label>
       <input id="m_rule" placeholder="e.g. ₱300 / day" /></div>
     <div class="field"><label>Expected Monthly Payment (₱)</label>
@@ -634,9 +692,12 @@ function addLoan(name) {
       const totalDebt = Number($("m_debt").value);
       const paymentRule = $("m_rule").value.trim();
       const monthlyTarget = Number($("m_target").value) || 0;
+      const dueVal = $("m_due").value;
+      const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
+      const note = $("m_note").value.trim();
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      await DebtorsDB.add({ name, totalDebt, paymentRule, monthlyTarget });
+      await DebtorsDB.add({ name, totalDebt, paymentRule, monthlyTarget, dueDate, note });
       closeModal();
       toast("Debt entry added.");
       refreshCurrentView();
@@ -745,6 +806,8 @@ const DATA_HEADERS = [
   "Payment Rule",
   "Payment Date",
   "Payment Amount",
+  "Due Date",
+  "Note",
 ];
 
 /** ISO timestamp -> "YYYY-MM-DD" using local date parts. */
@@ -768,13 +831,15 @@ async function exportDataCSV() {
   const rows = [];
   persons.forEach((p) => {
     const rule = (p.loans.map((l) => l.paymentRule).find((r) => r && r.trim()) || "").trim();
+    const due = p.dueDate ? isoDay(p.dueDate) : "";
+    const note = p.note || "";
     const pays = [...p.payments].sort((a, b) => new Date(a.date) - new Date(b.date));
     if (pays.length) {
       pays.forEach((pay) =>
-        rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, isoDay(pay.date), pay.amount])
+        rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, isoDay(pay.date), pay.amount, due, note])
       );
     } else {
-      rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, "", ""]);
+      rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, "", "", due, note]);
     }
   });
 
@@ -947,7 +1012,9 @@ async function importDataCSV(file) {
     iTarget = col["monthly target"],
     iRule = col["payment rule"],
     iPd = col["payment date"],
-    iPa = col["payment amount"];
+    iPa = col["payment amount"],
+    iDue = col["due date"],
+    iNote = col["note"];
 
   const persons = new Map();
   for (let r = 1; r < raw.length; r++) {
@@ -961,6 +1028,8 @@ async function importDataCSV(file) {
         totalDebt: parseNum(row[iDebt]),
         monthlyTarget: iTarget != null ? parseNum(row[iTarget]) : 0,
         paymentRule: iRule != null ? String(row[iRule] || "").trim() : "",
+        dueDate: iDue != null ? parseDateISO(row[iDue]) || "" : "",
+        note: iNote != null ? String(row[iNote] || "").trim() : "",
         payments: [],
       });
     }
@@ -1023,6 +1092,8 @@ async function importDataCSV(file) {
       totalDebt: p.totalDebt,
       paymentRule: p.paymentRule,
       monthlyTarget: p.monthlyTarget,
+      dueDate: p.dueDate || "",
+      note: p.note || "",
     });
     dCount++;
     for (const pay of p.payments) {
@@ -1041,15 +1112,9 @@ async function importDataCSV(file) {
 
 /* -------------------- Event wiring -------------------- */
 
-// Add-debtor button
-$("addDebtorBtn").addEventListener("click", addDebtor);
-
-// Collapsible Add-Debtor card
-$("addToggleBtn").addEventListener("click", () => {
-  const body = $("addDebtorBody");
-  const hidden = body.classList.toggle("hidden");
-  $("addToggleBtn").textContent = hidden ? "Expand" : "Minimize";
-});
+// Add-debtor buttons (header + empty state) open the modal
+$("addDebtorBtn").addEventListener("click", openAddDebtor);
+$("emptyAddBtn").addEventListener("click", openAddDebtor);
 
 // Search + filter
 $("search").addEventListener("input", (e) => {
@@ -1090,18 +1155,6 @@ document.body.addEventListener("click", (e) => {
   const act = btn.dataset.act;
 
   switch (act) {
-    case "pay": {
-      // Find the nearest payment input relative to this button.
-      const input =
-        btn.parentElement.querySelector(".pay-input") ||
-        document.querySelector(`.pay-input[data-id="${id}"]`) ||
-        $("detailPayInput");
-      const amount = input ? input.value : 0;
-      addPayment(id, amount).then(() => {
-        if (input) input.value = "";
-      });
-      break;
-    }
     case "paymodal":
       openPaymentModal(id, btn.dataset.name || "");
       break;
@@ -1129,15 +1182,6 @@ document.body.addEventListener("click", (e) => {
   }
 });
 
-// Enter key inside a payment input triggers its Add Payment button.
-document.body.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && e.target.classList.contains("pay-input")) {
-    const card = e.target.closest(".card");
-    const payBtn = card && card.querySelector('[data-act="pay"]');
-    if (payBtn) payBtn.click();
-  }
-});
-
 /* -------------------- Offline indicator -------------------- */
 
 function updateOnlineStatus() {
@@ -1158,7 +1202,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "2.0.3";
+const APP_VERSION = "3.0";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

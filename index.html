@@ -3,18 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f766e" />
+  <meta name="theme-color" content="#eef2f7" />
   <meta name="author" content="Jongparkour" />
   <meta name="description" content="Offline debt & payment tracker in Philippine Peso. Built by Jongparkour." />
   <title>Debt Tracker</title>
   <script>
-    /* Apply saved theme before paint to avoid a flash. Default = dark. */
+    /* Apply saved theme before paint to avoid a flash. Default = light (v3).
+       One-time migration: flip pre-v3 installs (which auto-stored "dark") to light. */
     (function () {
       try {
-        var t = localStorage.getItem("dt_theme") || "dark";
+        if (!localStorage.getItem("dt_theme_v3")) {
+          localStorage.setItem("dt_theme", "light");
+          localStorage.setItem("dt_theme_v3", "1");
+        }
+        var t = localStorage.getItem("dt_theme") || "light";
         document.documentElement.setAttribute("data-theme", t);
       } catch (e) {
-        document.documentElement.setAttribute("data-theme", "dark");
+        document.documentElement.setAttribute("data-theme", "light");
       }
     })();
   </script>
@@ -29,18 +34,6 @@
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-
-  <header class="app-bar">
-    <div class="brand-mark">💰</div>
-    <div class="app-bar-title">
-      <h1>Debt Tracker</h1>
-      <span class="app-bar-sub">Loans &amp; Repayment Management</span>
-    </div>
-    <div class="app-bar-right">
-      <span id="offlineBadge" class="badge hidden">Offline</span>
-      <button id="settingsBtn" class="icon-btn hidden" title="Settings" aria-label="Settings">⚙️</button>
-    </div>
-  </header>
 
   <!-- ============ LOCK SCREEN (shown by default, JS hides it) ============ -->
   <div id="lockScreen" class="lock">
@@ -108,79 +101,73 @@
   <!-- ============ LIST VIEW ============ -->
   <main id="listView" class="view">
 
-    <!-- Dashboard metric tiles -->
-    <section class="tiles">
-      <div class="tile total">
-        <p class="tile-label">Total Debt</p>
-        <p class="tile-value" id="statTotalDebt">₱0.00</p>
-        <span class="tile-sub">Active balances</span>
+    <header class="page-header">
+      <div class="page-title">
+        <h1>Debt Tracker</h1>
+        <p>Everything you're owed, in one place.</p>
       </div>
-      <div class="tile count">
-        <p class="tile-label">Debtors</p>
-        <p class="tile-value" id="statDebtors">0</p>
-        <span class="tile-sub">Active profiles</span>
+      <div class="page-actions">
+        <span id="offlineBadge" class="badge hidden">Offline</span>
+        <button class="btn add-btn" id="addDebtorBtn">+ Add debtor</button>
+        <button id="settingsBtn" class="icon-btn hidden" title="Settings" aria-label="Settings">⚙️</button>
       </div>
-      <div class="tile overdue">
-        <p class="tile-label">Overdue</p>
-        <p class="tile-value" id="statOverdue">0</p>
-        <span class="tile-sub">Requires follow-up</span>
+    </header>
+
+    <!-- Dashboard: hero + secondary stats -->
+    <section class="dashboard">
+      <div class="hero">
+        <p class="hero-label">Outstanding debt</p>
+        <p class="hero-value" id="statOutstanding">₱0.00</p>
+        <div class="hero-bar"><span id="heroBar" style="width:0%"></span></div>
+        <p class="hero-sub"><span id="statCollectedPct">0%</span> of total collected</p>
       </div>
-      <div class="tile collected">
-        <p class="tile-label">Collected</p>
-        <p class="tile-value" id="statCollected">₱0.00</p>
-        <span class="tile-sub">Total repayments</span>
+      <div class="secondary">
+        <div class="stat">
+          <span class="stat-label">Collected</span>
+          <span class="stat-value" id="statCollected">₱0.00</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Debtors</span>
+          <span class="stat-value" id="statDebtors">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Paid in full</span>
+          <span class="stat-value" id="statPaidFull">0</span>
+        </div>
       </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Add Debtor</h2>
-        <button type="button" class="mini-toggle" id="addToggleBtn">Minimize</button>
-      </div>
-      <div id="addDebtorBody">
-        <div class="field">
-          <label for="name">Name</label>
-          <input id="name" placeholder="e.g. Juan Dela Cruz" />
+    <!-- Debtors -->
+    <section class="debtors-section">
+      <div id="listControls">
+        <div class="section-head">
+          <h2>Debtors</h2>
+          <span id="summary" class="muted"></span>
         </div>
-        <div class="field">
-          <label for="debt">Total Debt (₱)</label>
-          <input id="debt" type="number" inputmode="decimal" min="0" placeholder="0.00" />
+        <div class="toolbar">
+          <input id="search" class="search" type="search" placeholder="🔍 Search by name" />
+          <select id="filter" class="filter">
+            <option value="all">All</option>
+            <option value="active">Active debts</option>
+            <option value="paid">Fully paid</option>
+          </select>
         </div>
-        <div class="field">
-          <label for="rule">Payment Rule</label>
-          <input id="rule" placeholder="e.g. ₱300 / day" />
+        <div class="toolbar export-bar">
+          <button class="btn small ghost" id="exportBtn">⬇ Export CSV</button>
+          <button class="btn small ghost" id="importBtn">⬆ Import CSV</button>
         </div>
-        <div class="field">
-          <label for="target">Expected Monthly Payment (₱) — optional</label>
-          <input id="target" type="number" inputmode="decimal" min="0" placeholder="e.g. 2000" />
-        </div>
-        <button class="btn primary" id="addDebtorBtn">Add Debtor</button>
-      </div>
-    </section>
-
-    <section>
-      <div class="section-head">
-        <h2>Debtors</h2>
-        <span id="summary" class="muted"></span>
-      </div>
-
-      <div class="toolbar">
-        <input id="search" class="search" type="search" placeholder="🔍 Search by name" />
-        <select id="filter" class="filter">
-          <option value="all">All</option>
-          <option value="active">Active debts</option>
-          <option value="paid">Fully paid</option>
-        </select>
-      </div>
-
-      <div class="toolbar export-bar">
-        <button class="btn small" id="exportBtn">⬇ Export data (CSV)</button>
-        <button class="btn small" id="importBtn">⬆ Import data (CSV)</button>
       </div>
       <input type="file" id="importFile" accept=".csv,text/csv,text/plain" hidden />
 
       <div id="list" class="cards"></div>
-      <p id="empty" class="empty hidden">No debtors yet. Add one above to get started.</p>
+
+      <!-- Friendly empty state -->
+      <div id="empty" class="empty-state hidden">
+        <div class="empty-icon">👥</div>
+        <h3>No debtors yet</h3>
+        <p>Keep track of who owes you what. Add your first debtor and payments will show up here.</p>
+        <button class="btn primary" id="emptyAddBtn">+ Add your first debtor</button>
+      </div>
       <p id="noMatch" class="empty hidden">No debtors match your search.</p>
     </section>
   </main>
@@ -206,7 +193,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="site-footer">
-    Jongparkour · Debt Tracker v2.0.3
+    Jongparkour · Debt Tracker v3.0
   </footer>
 
   <script src="./db.js"></script>
