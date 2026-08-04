@@ -1165,16 +1165,16 @@ $("modalOverlay").addEventListener("click", (e) => {
   if (e.target.id === "modalOverlay") closeModal();
 });
 
-// Tap a blurred amount to reveal it (only while "Hide amounts" is on).
-// Capture phase so it runs before the card's view handler and can swallow the tap.
+// Tap a hidden amount to toggle it: first tap reveals, next tap blurs again.
+// Capture phase so it runs before the card's view handler and swallows the tap.
 document.addEventListener(
   "click",
   (e) => {
     if (!document.documentElement.classList.contains("hide-amounts")) return;
     const m = e.target.closest(".money");
-    if (m && !m.classList.contains("revealed")) {
-      m.classList.add("revealed");
-      e.stopPropagation(); // reveal only — don't also open the debtor
+    if (m) {
+      m.classList.toggle("revealed");
+      e.stopPropagation(); // toggling only — never opens the debtor
     }
   },
   true
@@ -1235,7 +1235,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.1.3";
+const APP_VERSION = "3.1.4";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
