@@ -343,6 +343,8 @@
     ["pinNew", "pinConfirm", "pinEnter"].forEach((id) => {
       if ($(id)) $(id).value = "";
     });
+    // Always reveal the dashboard after unlocking — never a stale Settings/detail view.
+    if (window.showList) showList();
   }
 
   async function showUnlock() {
