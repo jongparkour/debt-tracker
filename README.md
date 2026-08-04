@@ -8,6 +8,25 @@ Built by **Jongparkour**.
 
 ---
 
+## 📱 Install on your phone
+
+**Try the app now — no Play Store needed.**
+
+**Android — download the APK:**
+👉 **[Download Debt Tracker (APK)](https://github.com/jongparkour/debt-tracker/releases/latest/download/debt-tracker.apk)**
+1. Tap the link on your phone to download the `.apk`.
+2. Open the downloaded file. Android will ask to **allow install from unknown sources** — tap **Settings → allow**, then **Install**. (This is normal for any app not from the Play Store.)
+3. Open it — it runs fullscreen, no browser bar, and works offline.
+
+**iPhone / iPad (APKs don't work on iOS):**
+Open **https://iridescent-mooncake-68869c.netlify.app** in **Safari** → tap **Share** → **Add to Home Screen**. It installs like an app.
+
+**Prefer the web version (any device):** just open the link above in your browser.
+
+> The download button also appears at the bottom of the app itself.
+
+---
+
 ## Features
 - Debtors: add / edit / delete (name, total debt, payment rule)
 - Payments: add / edit / delete (amount + date), grouped by month

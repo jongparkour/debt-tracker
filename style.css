@@ -874,10 +874,28 @@ body.modal-open { overflow: hidden; }
   color: var(--muted);
   font-size: 0.78rem;
   letter-spacing: 0.02em;
-  padding: 20px 16px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
-  opacity: 0.75;
+  padding: 24px 16px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
+.site-footer .apk-link {
+  display: inline-block;
+  background: var(--hero-bg);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow);
+}
+.site-footer .apk-link:active { filter: brightness(1.12); }
+.site-footer .apk-note {
+  max-width: 460px;
+  margin: 12px auto 0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+.site-footer .footer-mark { margin: 16px 0 0; opacity: 0.75; }
 
 /* ---------- Toast ---------- */
 .toast {
