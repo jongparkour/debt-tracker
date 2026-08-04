@@ -966,6 +966,18 @@ body.modal-open { overflow: hidden; }
 .loan-info small { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
 .loan-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
+/* ---------- Hide amounts (blur until tapped) ---------- */
+.hide-amounts .money:not(.revealed) {
+  filter: blur(8px);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: filter 0.18s ease;
+}
+/* Keep the blurred blob from spilling past its own box */
+.hide-amounts .money { border-radius: 4px; }
+.hide-amounts .money.revealed { filter: none; }
+
 /* ---------- Settings screen ---------- */
 .settings-h1 { margin: 0 0 18px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
 .settings-card {

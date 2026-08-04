@@ -94,6 +94,18 @@ function toggleTheme() {
   return next;
 }
 
+/* -------------------- Privacy: hide amounts by default -------------------- */
+
+/** Reflect the "Hide amounts by default" preference as a root class so CSS
+ *  can blur every element tagged `.money` until it's tapped to reveal. */
+function applyHideAmounts() {
+  let on = false;
+  try {
+    on = localStorage.getItem("dt_hideAmounts") === "1";
+  } catch (e) {}
+  document.documentElement.classList.toggle("hide-amounts", on);
+}
+
 /* -------------------- Name / month helpers -------------------- */
 
 /** Normalize a name for grouping (case-insensitive, trimmed, collapsed spaces). */
@@ -307,6 +319,7 @@ let searchTerm = "";
 let statusFilter = "all"; // all | active | paid
 
 async function loadDebtors(animateCards = false) {
+  applyHideAmounts(); // re-sync the blur preference on every render
   const [debtors, allPayments] = await Promise.all([
     DebtorsDB.getAll(),
     PaymentsDB.getAll(),
@@ -394,14 +407,14 @@ async function loadDebtors(animateCards = false) {
       ${
         settled
           ? ""
-          : `<p class="dcard-amount">${peso(
+          : `<p class="dcard-amount"><span class="money">${peso(
               p.remaining
-            )}<span class="dcard-amount-label">remaining</span></p>`
+            )}</span><span class="dcard-amount-label">remaining</span></p>`
       }
       ${
         !settled && p.paid > 0
           ? `<div class="dcard-bar"><span style="width:${progress}%"></span></div>
-             <p class="dcard-sub">${peso(p.paid)} paid of ${peso(p.totalDebt)}</p>`
+             <p class="dcard-sub"><span class="money">${peso(p.paid)} paid of ${peso(p.totalDebt)}</span></p>`
           : ""
       }
       ${meta.length ? `<div class="dcard-meta">${meta.join("")}</div>` : ""}
@@ -440,6 +453,7 @@ let currentDetailKey = null;
 
 /** `repId` is any loan id belonging to the person; we resolve the whole person. */
 async function showDetail(repId) {
+  applyHideAmounts();
   const rep = await DebtorsDB.get(repId);
   if (!rep) return showList();
 
@@ -467,7 +481,7 @@ async function showDetail(repId) {
       return `
         <div class="loan">
           <div class="loan-info">
-            <b>${peso(l.totalDebt)}</b>
+            <b class="money">${peso(l.totalDebt)}</b>
             ${bits.length ? `<small>${bits.join(" · ")}</small>` : ""}
           </div>
           <div class="loan-actions">
@@ -500,7 +514,7 @@ async function showDetail(repId) {
           .map(
             (p) => `
           <li class="pay-row">
-            <div><b>${peso(p.amount)}</b><span class="muted"> · ${fmtDate(
+            <div><b class="money">${peso(p.amount)}</b><span class="muted"> · ${fmtDate(
               p.date
             )}</span></div>
             <div class="pay-row-actions">
@@ -538,7 +552,7 @@ async function showDetail(repId) {
           <div class="month">
             <div class="month-head">
               <span>${esc(g.label)}</span>
-              <span>${statusHtml} <b>${peso(g.total)}</b></span>
+              <span>${statusHtml} <b class="money">${peso(g.total)}</b></span>
             </div>
             ${expectedHtml}
             ${barHtml}
@@ -565,12 +579,16 @@ async function showDetail(repId) {
       <div class="card-head">
         <h2>${esc(person.name)}</h2>
         <span class="pill ${person.remaining <= 0 ? "paid" : ""}">
-          ${person.remaining <= 0 ? "Settled" : peso(person.remaining) + " left"}
+          ${
+            person.remaining <= 0
+              ? "Settled"
+              : `<span class="money">${peso(person.remaining)} left</span>`
+          }
         </span>
       </div>
       <div class="stats big">
-        <div><span class="muted">Total</span><b>${peso(person.totalDebt)}</b></div>
-        <div><span class="muted">Paid</span><b>${peso(person.paid)}</b></div>
+        <div><span class="muted">Total</span><b class="money">${peso(person.totalDebt)}</b></div>
+        <div><span class="muted">Paid</span><b class="money">${peso(person.paid)}</b></div>
       </div>
       ${metaLine}
       ${targetLine}
@@ -1147,6 +1165,21 @@ $("modalOverlay").addEventListener("click", (e) => {
   if (e.target.id === "modalOverlay") closeModal();
 });
 
+// Tap a blurred amount to reveal it (only while "Hide amounts" is on).
+// Capture phase so it runs before the card's view handler and can swallow the tap.
+document.addEventListener(
+  "click",
+  (e) => {
+    if (!document.documentElement.classList.contains("hide-amounts")) return;
+    const m = e.target.closest(".money");
+    if (m && !m.classList.contains("revealed")) {
+      m.classList.add("revealed");
+      e.stopPropagation(); // reveal only — don't also open the debtor
+    }
+  },
+  true
+);
+
 // Delegated clicks for all data-act buttons (list + detail)
 document.body.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-act]");
@@ -1202,7 +1235,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.1";
+const APP_VERSION = "3.1.1";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
