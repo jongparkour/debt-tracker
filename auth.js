@@ -680,7 +680,7 @@
       }, 600);
     }
 
-    $("pinUnlockBtn").addEventListener("click", () => tryPin());
+    // No unlock button: the PIN auto-submits at full length (below). Enter also works.
     $("pinEnter").addEventListener("keydown", (e) => {
       if (e.key === "Enter") tryPin();
     });

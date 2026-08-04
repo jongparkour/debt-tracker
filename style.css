@@ -169,6 +169,22 @@ body {
   margin-bottom: 12px;
 }
 .lock-box .btn { width: 100%; margin-bottom: 8px; }
+/* Biometric unlock — icon-only circular button */
+.bio-icon {
+  width: 52px;
+  height: 52px;
+  margin: 6px auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--subtle-bg);
+  border: 1px solid var(--line);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.bio-icon:active { transform: scale(0.95); background: var(--pill-active-bg); }
 .lock-msg {
   min-height: 1.1em;
   margin: 6px 0 0;
