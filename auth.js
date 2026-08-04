@@ -13,7 +13,24 @@
   const LS_REC = "dt_rec"; // { salt, hash, iter } for the recovery code
   const INACTIVITY_MS = 5 * 60 * 1000; // lock 5 min after last use
   const LS_ACTIVITY = "dt_active"; // last-activity timestamp (persists reloads)
+  const LS_LOCK_CLOSE = "dt_lockOnClose"; // "1" (default) = require PIN on every reopen
+  const LS_HIDE_AMT = "dt_hideAmounts"; // "1" = blur balances until tapped
   const FEEDBACK_EMAIL = "libosadajosephy@gmail.com";
+
+  /* Privacy preferences (with sensible defaults). */
+  function getLockOnClose() {
+    const v = localStorage.getItem(LS_LOCK_CLOSE);
+    return v === null ? true : v === "1"; // default ON
+  }
+  function setLockOnClose(on) {
+    try { localStorage.setItem(LS_LOCK_CLOSE, on ? "1" : "0"); } catch (e) {}
+  }
+  function getHideAmounts() {
+    return localStorage.getItem(LS_HIDE_AMT) === "1"; // default OFF
+  }
+  function setHideAmounts(on) {
+    try { localStorage.setItem(LS_HIDE_AMT, on ? "1" : "0"); } catch (e) {}
+  }
 
   let currentRecoveryCode = ""; // held only in memory while shown at setup
   let lastActivity = 0; // timestamp of last user interaction
@@ -42,8 +59,11 @@
       localStorage.removeItem(LS_ACTIVITY);
     } catch (e) {}
   }
-  /** True if last use (even before a reload) is within the 5-min window. */
+  /** True if last use (even before a reload) is within the 5-min window.
+   *  When "Lock when app closes" is on, there is no grace — the PIN is always
+   *  required on reopen. */
   function withinGrace() {
+    if (getLockOnClose()) return false;
     const stored = Number(localStorage.getItem(LS_ACTIVITY) || 0);
     return stored > 0 && now() - stored < INACTIVITY_MS;
   }
@@ -341,177 +361,294 @@
   /* ---------------- Settings (Change PIN + biometrics) ---------------- */
 
   async function openSettings() {
-    // Reuse the app's generic modal (from app.js).
-    openModal(
-      "Settings",
-      `
-      <div class="settings-section-title">Appearance</div>
-      <div class="theme-seg">
-        <button type="button" class="btn small" id="s_themeDark">🌙 Dark</button>
-        <button type="button" class="btn small" id="s_themeLight">☀️ Light</button>
-      </div>
+    const startTheme = window.getTheme ? getTheme() : "light";
+    let pendingTheme = startTheme;
+    const bioSupported = await biometricSupported();
 
-      <div class="settings-section-title">Change PIN (4 digits)</div>
-      <div class="field"><label>Current PIN</label>
-        <input id="s_cur" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></div>
-      <div class="field"><label>New PIN</label>
-        <input id="s_new" type="password" inputmode="numeric" maxlength="4" autocomplete="off" /></div>
-      <div class="field"><label>Confirm New PIN</label>
-        <input id="s_conf" type="password" inputmode="numeric" maxlength="4" autocomplete="off" /></div>
+    $("settingsBody").innerHTML = `
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <div class="settings-card-icon">☀️</div>
+          <div class="settings-card-title"><h2>Appearance</h2>
+            <p>Choose how Debt Tracker looks on this device.</p></div>
+        </div>
+        <div class="theme-seg" id="s_themeSeg">
+          <button type="button" class="seg-btn" data-theme="light">☀️ Light</button>
+          <button type="button" class="seg-btn" data-theme="dark">🌙 Dark</button>
+        </div>
+      </section>
 
-      <div class="settings-section-title">Security</div>
-      <div class="settings-bio">
-        <span id="s_bioLabel" class="muted"></span>
-        <button type="button" class="btn small hidden" id="s_bioBtn"></button>
-      </div>
-      <div class="settings-bio">
-        <span id="s_recLabel" class="muted"></span>
-        <button type="button" class="btn small" id="s_recBtn"></button>
-      </div>
-      <div id="s_recBox" class="recovery-code hidden"></div>
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <div class="settings-card-icon">🛡️</div>
+          <div class="settings-card-title"><h2>Security</h2>
+            <p>Protect your balances with a PIN and privacy options.</p></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>New PIN</label>
+            <input id="s_new" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••" /></div>
+          <div class="field"><label>Confirm PIN</label>
+            <input id="s_conf" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••" /></div>
+        </div>
+        <p class="pin-help" id="s_pinHelp">Use 4 digits. Leave blank to keep your current PIN.</p>
 
-      <div class="settings-section-title">Feedback</div>
-      <div class="field">
-        <label for="s_feedback">Suggestions to improve the app</label>
-        <textarea id="s_feedback" rows="3" placeholder="Tell the developer what to change or add…"></textarea>
-      </div>
-      <button type="button" class="btn" id="s_feedbackBtn" style="width:100%;">✉️ Send feedback</button>
+        <div class="setting-row">
+          <div class="setting-row-text">
+            <span class="setting-row-label">Lock when app closes</span>
+            <span class="setting-row-cap">Require the PIN every time you reopen.</span>
+          </div>
+          <label class="switch"><input type="checkbox" id="s_lockClose" /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-text">
+            <span class="setting-row-label">Hide amounts by default</span>
+            <span class="setting-row-cap">Blur balances until you tap to reveal.</span>
+          </div>
+          <label class="switch"><input type="checkbox" id="s_hideAmt" /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+        </div>
+        <div class="setting-row" id="s_bioRow">
+          <div class="setting-row-text">
+            <span class="setting-row-label">Fingerprint / face unlock</span>
+            <span class="setting-row-cap" id="s_bioCap"></span>
+          </div>
+          <button type="button" class="btn small hidden" id="s_bioBtn"></button>
+        </div>
+        <div class="setting-row">
+          <div class="setting-row-text">
+            <span class="setting-row-label">Recovery code</span>
+            <span class="setting-row-cap" id="s_recCap"></span>
+          </div>
+          <button type="button" class="btn small" id="s_recBtn"></button>
+        </div>
+        <div id="s_recBox" class="recovery-code hidden"></div>
+      </section>
 
-      <button type="button" class="btn" id="s_lockBtn" style="width:100%;margin-top:14px;">🔒 Lock app now</button>
-      <p id="s_msg" class="lock-msg"></p>
-      `,
-      async () => {
-        const cur = $("s_cur").value.trim();
-        const nw = $("s_new").value.trim();
-        const cf = $("s_conf").value.trim();
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <div class="settings-card-icon">💬</div>
+          <div class="settings-card-title"><h2>Feedback</h2>
+            <p>Tell us what's working and what isn't.</p></div>
+        </div>
+        <div class="field">
+          <textarea id="s_feedback" rows="4" maxlength="1000" placeholder="Share an idea or report a problem…"></textarea>
+          <div class="char-count"><span id="s_fbCount">0</span>/1000</div>
+        </div>
+        <button type="button" class="btn" id="s_feedbackBtn" style="width:100%;">✉️ Send feedback</button>
+      </section>
 
-        // Nothing typed → they may have only toggled biometrics; just close.
-        if (!cur && !nw && !cf) return closeModal();
+      <section class="settings-card danger-card">
+        <div class="setting-row-text">
+          <span class="setting-row-label">Lock app now</span>
+          <span class="setting-row-cap">Immediately hide everything behind your PIN.</span>
+        </div>
+        <button type="button" class="btn danger-btn" id="s_lockBtn">🔒 Lock now</button>
+      </section>
 
-        if (!(await verifyPin(cur)))
-          return ($("s_msg").textContent = "Current PIN is incorrect.");
-        if (!/^\d{4}$/.test(nw))
-          return ($("s_msg").textContent = "New PIN must be exactly 4 digits.");
-        if (nw !== cf)
-          return ($("s_msg").textContent = "New PINs don't match.");
+      <p id="s_msg" class="settings-msg"></p>
+    `;
 
-        await setPin(nw);
-        closeModal();
-        if (window.toast) toast("PIN changed.");
-      }
+    showView("settingsView");
+
+    const save = $("settingsSave");
+    const setMsg = (t, ok) => {
+      const m = $("s_msg");
+      m.textContent = t || "";
+      m.classList.toggle("ok", !!ok);
+    };
+    function markDirty() {
+      save.disabled = false;
+    }
+
+    // ----- Appearance: segmented toggle (preview live, persist on Save) -----
+    const seg = $("s_themeSeg");
+    function paintSeg() {
+      seg.querySelectorAll(".seg-btn").forEach((b) =>
+        b.classList.toggle("active", b.dataset.theme === pendingTheme)
+      );
+    }
+    function previewTheme(t) {
+      document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+      const mm = document.querySelector('meta[name="theme-color"]');
+      if (mm) mm.setAttribute("content", t === "light" ? "#eef2f7" : "#080d1a");
+    }
+    paintSeg();
+    seg.querySelectorAll(".seg-btn").forEach((b) =>
+      b.addEventListener("click", () => {
+        pendingTheme = b.dataset.theme;
+        previewTheme(pendingTheme);
+        paintSeg();
+        markDirty();
+      })
     );
 
-    // Configure the biometric row based on device support + enrollment.
-    const supported = await biometricSupported();
-    const label = $("s_bioLabel");
-    const btn = $("s_bioBtn");
+    // ----- Security: PIN with inline validation -----
+    const sNew = $("s_new"),
+      sConf = $("s_conf"),
+      pinHelp = $("s_pinHelp");
+    function validatePin() {
+      const a = sNew.value.trim(),
+        b = sConf.value.trim();
+      if (!a && !b) {
+        pinHelp.textContent = "Use 4 digits. Leave blank to keep your current PIN.";
+        pinHelp.className = "pin-help";
+        return { ok: true, change: false };
+      }
+      if (!/^\d{4}$/.test(a)) {
+        pinHelp.textContent = "New PIN must be exactly 4 digits.";
+        pinHelp.className = "pin-help bad";
+        return { ok: false };
+      }
+      if (a !== b) {
+        pinHelp.textContent = "PINs don't match yet.";
+        pinHelp.className = "pin-help bad";
+        return { ok: false };
+      }
+      pinHelp.textContent = "Looks good — press Save to update your PIN.";
+      pinHelp.className = "pin-help good";
+      return { ok: true, change: true, pin: a };
+    }
+    [sNew, sConf].forEach((el) =>
+      el.addEventListener("input", () => {
+        validatePin();
+        markDirty();
+      })
+    );
 
-    function refreshBioRow() {
-      if (!supported) {
-        label.textContent = "Biometrics not available on this device.";
-        hide(btn);
+    // ----- Privacy toggles -----
+    const lockClose = $("s_lockClose"),
+      hideAmt = $("s_hideAmt");
+    lockClose.checked = getLockOnClose();
+    hideAmt.checked = getHideAmounts();
+    lockClose.addEventListener("change", markDirty);
+    hideAmt.addEventListener("change", markDirty);
+
+    // ----- Biometrics (applied immediately) -----
+    const bioBtn = $("s_bioBtn"),
+      bioCap = $("s_bioCap");
+    function refreshBio() {
+      if (!bioSupported) {
+        bioCap.textContent = "Not available on this device.";
+        hide(bioBtn);
         return;
       }
       if (biometricEnrolled()) {
-        label.textContent = "Fingerprint / face unlock: On";
-        btn.textContent = "Disable";
-        btn.classList.add("danger");
+        bioCap.textContent = "On — quick unlock enabled.";
+        bioBtn.textContent = "Disable";
+        bioBtn.classList.add("danger");
       } else {
-        label.textContent = "Fingerprint / face unlock: Off";
-        btn.textContent = "Enable";
-        btn.classList.remove("danger");
+        bioCap.textContent = "Use your fingerprint or face to unlock.";
+        bioBtn.textContent = "Enable";
+        bioBtn.classList.remove("danger");
       }
-      show(btn);
+      show(bioBtn);
     }
-    refreshBioRow();
-
-    btn.addEventListener("click", async () => {
+    refreshBio();
+    bioBtn.addEventListener("click", async () => {
       if (biometricEnrolled()) {
         localStorage.removeItem(LS_CRED);
         if (window.toast) toast("Biometric unlock disabled.");
-        refreshBioRow();
+        refreshBio();
       } else {
         try {
-          $("s_msg").textContent = "Follow your device's prompt…";
+          setMsg("Follow your device's prompt…");
           await enrollBiometric();
-          $("s_msg").textContent = "";
+          setMsg("");
           if (window.toast) toast("Biometric unlock enabled.");
-          refreshBioRow();
+          refreshBio();
         } catch (err) {
-          $("s_msg").textContent = "Couldn't enable biometrics.";
+          setMsg("Couldn't enable biometrics.");
         }
       }
     });
 
-    // --- Recovery-code row ---
-    const recLabel = $("s_recLabel");
-    const recBtn = $("s_recBtn");
-    const recBox = $("s_recBox");
-
-    function refreshRecRow() {
+    // ----- Recovery code (applied immediately) -----
+    const recBtn = $("s_recBtn"),
+      recCap = $("s_recCap"),
+      recBox = $("s_recBox");
+    function refreshRec() {
       if (hasRecovery()) {
-        recLabel.textContent = "Recovery code: set";
+        recCap.textContent = "Set — regenerate to get a new one.";
         recBtn.textContent = "Regenerate";
       } else {
-        recLabel.textContent = "Recovery code: not set";
+        recCap.textContent = "Not set — create a backup code.";
         recBtn.textContent = "Create";
       }
     }
-    refreshRecRow();
-
+    refreshRec();
     recBtn.addEventListener("click", async () => {
       const code = genRecoveryCode();
       await setRecovery(code);
       recBox.textContent = code;
       show(recBox);
-      refreshRecRow();
-      $("s_msg").textContent = "New code shown above — save it. The old one no longer works.";
+      refreshRec();
+      setMsg("New code shown above — save it. The old one no longer works.", true);
     });
 
-    // --- Appearance (theme) ---
-    const darkBtn = $("s_themeDark");
-    const lightBtn = $("s_themeLight");
-    function refreshTheme() {
-      const cur = window.getTheme ? getTheme() : "dark";
-      darkBtn.classList.toggle("active", cur === "dark");
-      lightBtn.classList.toggle("active", cur === "light");
-    }
-    refreshTheme();
-    darkBtn.addEventListener("click", () => {
-      if (window.applyTheme) applyTheme("dark");
-      refreshTheme();
+    // ----- Feedback (opens the email app) -----
+    const fb = $("s_feedback"),
+      fbCount = $("s_fbCount");
+    fb.addEventListener("input", () => {
+      fbCount.textContent = fb.value.length;
     });
-    lightBtn.addEventListener("click", () => {
-      if (window.applyTheme) applyTheme("light");
-      refreshTheme();
-    });
-
-    // --- Feedback (opens the user's email app) ---
     $("s_feedbackBtn").addEventListener("click", () => {
-      const text = $("s_feedback").value.trim();
-      if (!text) {
-        $("s_msg").textContent = "Type your suggestion first.";
-        return;
-      }
+      const text = fb.value.trim();
+      if (!text) return setMsg("Type your suggestion first.");
       const subject = "Debt Tracker feedback (v" + (window.APP_VERSION || "1") + ")";
-      const url =
+      window.location.href =
         "mailto:" +
         FEEDBACK_EMAIL +
         "?subject=" +
         encodeURIComponent(subject) +
         "&body=" +
         encodeURIComponent(text);
-      window.location.href = url;
-      $("s_feedback").value = "";
-      $("s_msg").textContent = "";
-      if (window.toast) toast("Opening your email app…");
+      fb.value = "";
+      fbCount.textContent = "0";
+      setMsg("Opening your email app…", true);
     });
 
-    // --- Lock now ---
+    // ----- Lock now (immediate) -----
     $("s_lockBtn").addEventListener("click", () => {
-      closeModal();
+      previewTheme(window.getTheme ? getTheme() : "light"); // drop any unsaved theme preview
       lockNow();
     });
+
+    // ----- Sticky Save / Discard bar (static elements → assign, don't stack) -----
+    save.disabled = true;
+    save.textContent = "Save changes";
+    save.onclick = async () => {
+      const v = validatePin();
+      if (!v.ok) return setMsg("Fix the PIN fields before saving.");
+      if (v.change) await setPin(v.pin);
+      if (window.applyTheme) applyTheme(pendingTheme); // persist theme
+      setLockOnClose(lockClose.checked);
+      setHideAmounts(hideAmt.checked);
+      sNew.value = "";
+      sConf.value = "";
+      validatePin();
+      save.disabled = true;
+      save.textContent = "Saved ✓";
+      setMsg("Settings saved.", true);
+      setTimeout(() => {
+        save.textContent = "Save changes";
+      }, 1600);
+      if (window.loadDebtors) loadDebtors();
+    };
+    $("settingsDiscard").onclick = () => {
+      pendingTheme = startTheme;
+      previewTheme(startTheme);
+      paintSeg();
+      sNew.value = "";
+      sConf.value = "";
+      validatePin();
+      lockClose.checked = getLockOnClose();
+      hideAmt.checked = getHideAmounts();
+      save.disabled = true;
+      setMsg("Changes discarded.");
+    };
+    $("settingsBackBtn").onclick = () => {
+      previewTheme(window.getTheme ? getTheme() : "light"); // revert unsaved preview
+      if (window.showList) showList();
+    };
   }
 
   function lockNow() {

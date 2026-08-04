@@ -188,6 +188,17 @@
     <div id="detailContent"></div>
   </main>
 
+  <!-- ============ SETTINGS VIEW ============ -->
+  <main id="settingsView" class="view hidden">
+    <button class="btn ghost back" id="settingsBackBtn">← Back to dashboard</button>
+    <h1 class="settings-h1">Settings</h1>
+    <div id="settingsBody"></div>
+    <div class="savebar">
+      <button class="btn ghost" id="settingsDiscard">Discard</button>
+      <button class="btn primary" id="settingsSave" disabled>Save changes</button>
+    </div>
+  </main>
+
   <!-- ============ MODAL ============ -->
   <div id="modalOverlay" class="overlay hidden">
     <div class="modal">
@@ -203,7 +214,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="site-footer">
-    Jongparkour · Debt Tracker v3.0.2
+    Jongparkour · Debt Tracker v3.1
   </footer>
 
   <script src="./db.js"></script>
