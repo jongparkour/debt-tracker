@@ -575,7 +575,7 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--danger-border);
 }
 .dcard-note { margin: 0 0 12px; font-size: 0.8rem; color: var(--muted); font-style: italic; }
-.dcard-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+.dcard-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
 .dcard-actions .btn { flex: 0 0 auto; width: auto; }
 .badge-paid {
   flex-shrink: 0;

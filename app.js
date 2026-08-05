@@ -161,18 +161,22 @@ function flushSyncQueue() {
   );
 }
 
-/** Tap-to-send: open the phone's email app with a reminder pre-filled (free, private). */
-async function emailReminder(repId) {
+/** Resolve the whole person from any of their loan ids. */
+async function personFromRep(repId) {
   const rep = await DebtorsDB.get(repId);
-  if (!rep) return;
+  if (!rep) return null;
   const [debtors, pays] = await Promise.all([DebtorsDB.getAll(), PaymentsDB.getAll()]);
-  const person = buildPersons(debtors, pays).find((p) => p.key === normName(rep.name));
+  return buildPersons(debtors, pays).find((p) => p.key === normName(rep.name)) || null;
+}
+
+/** Tap-to-send email: opens the phone's email app with a reminder pre-filled. */
+async function emailReminder(repId) {
+  const person = await personFromRep(repId);
   if (!person) return;
-  if (!person.email) {
-    toast("Add an email for this debtor first (Edit).");
-    return;
-  }
-  const amt = peso(Math.max(0, person.remaining));
+  if (person.remaining <= 0) return toast(`${person.name} has no outstanding balance.`);
+  if (!person.email) return toast("Add an email for this debtor first (Edit).");
+
+  const amt = peso(person.remaining);
   const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
   const subject = `Payment reminder — ${amt}`;
   let body = `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}`;
@@ -185,6 +189,24 @@ async function emailReminder(repId) {
     encodeURIComponent(subject) +
     "&body=" +
     encodeURIComponent(body);
+}
+
+/** Tap-to-send text: opens the phone's Messages app with a SHORT reminder pre-filled. */
+async function smsReminder(repId) {
+  const person = await personFromRep(repId);
+  if (!person) return;
+  if (person.remaining <= 0) return toast(`${person.name} has no outstanding balance.`);
+  if (!person.phone) return toast("Add a phone number for this debtor first (Edit).");
+
+  const amt = peso(person.remaining);
+  const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
+  const body = `Hi ${person.name}, reminder: ${amt} balance${
+    dueStr ? " due " + dueStr : ""
+  }. Thank you!`;
+  const num = String(person.phone).replace(/[^\d+]/g, "");
+  // iOS wants "&body="; Android wants "?body=".
+  const sep = /iP(hone|od|ad)/.test(navigator.userAgent) ? "&" : "?";
+  window.location.href = "sms:" + num + sep + "body=" + encodeURIComponent(body);
 }
 
 /** Push a person's current state to the sheet; pass amount to also confirm a payment. */
@@ -267,8 +289,9 @@ function buildPersons(debtors, allPayments) {
     const dues = p.loans.map((l) => l.dueDate).filter(Boolean).sort();
     p.dueDate = dues[0] || "";
     p.note = p.loans.map((l) => l.note).filter(Boolean).join(" · ");
-    // First email found across this person's loan records.
+    // First email / phone found across this person's loan records.
     p.email = (p.loans.map((l) => l.email).find((e) => e && e.trim()) || "").trim();
+    p.phone = (p.loans.map((l) => l.phone).find((x) => x && x.trim()) || "").trim();
   });
   // Sort: unsettled first, then by name.
   persons.sort((a, b) => {
@@ -290,8 +313,12 @@ function openAddDebtor() {
     <p class="muted modal-intro">Record who owes you and how much.</p>
     <div class="field"><label>Name</label>
       <input id="a_name" placeholder="e.g. Juan Dela Cruz" /></div>
-    <div class="field"><label>Email <span class="muted">(for reminders)</span></label>
-      <input id="a_email" type="email" inputmode="email" autocomplete="off" placeholder="optional — juan@email.com" /></div>
+    <div class="field-row">
+      <div class="field"><label>Email <span class="muted">(reminders)</span></label>
+        <input id="a_email" type="email" inputmode="email" autocomplete="off" placeholder="juan@email.com" /></div>
+      <div class="field"><label>Phone <span class="muted">(text)</span></label>
+        <input id="a_phone" type="tel" inputmode="tel" autocomplete="off" placeholder="09xx xxx xxxx" /></div>
+    </div>
     <div class="field"><label>Amount owed (₱)</label>
       <input id="a_debt" type="number" inputmode="decimal" min="0" placeholder="0.00" /></div>
     <div class="field-row">
@@ -315,6 +342,7 @@ function openAddDebtor() {
       if (!(totalDebt > 0)) return toast("Enter a valid amount owed.");
 
       const email = $("a_email").value.trim();
+      const phone = $("a_phone").value.trim();
       const dueVal = $("a_due").value;
       const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
       const note = $("a_note").value.trim();
@@ -322,7 +350,7 @@ function openAddDebtor() {
       const monthlyTarget = $("a_target") ? Number($("a_target").value) || 0 : 0;
 
       const id = await DebtorsDB.add({
-        name, totalDebt, paymentRule, monthlyTarget, dueDate, note, email,
+        name, totalDebt, paymentRule, monthlyTarget, dueDate, note, email, phone,
       });
       closeModal();
       toast("Debtor added.");
@@ -551,7 +579,12 @@ async function loadDebtors(animateCards = false) {
         }
         ${
           !settled && p.email
-            ? `<button class="btn small" data-act="remind" data-id="${p.payToId}">✉️ Remind</button>`
+            ? `<button class="btn small" data-act="remind" data-id="${p.payToId}" title="Email reminder">✉️</button>`
+            : ""
+        }
+        ${
+          !settled && p.phone
+            ? `<button class="btn small" data-act="text" data-id="${p.payToId}" title="Text reminder">💬</button>`
             : ""
         }
         <button class="btn small ghost" data-act="delperson" data-id="${p.payToId}">Delete</button>
@@ -730,7 +763,9 @@ async function showDetail(repId) {
         ${
           person.remaining > 0
             ? `<button class="btn" data-act="remind" data-id="${person.payToId}"
-                 style="width:100%;margin-top:8px;">✉️ Send email reminder</button>`
+                 style="width:100%;margin-top:8px;">✉️ Send email reminder</button>
+               <button class="btn" data-act="text" data-id="${person.payToId}"
+                 style="width:100%;margin-top:8px;">💬 Send text reminder</button>`
             : ""
         }
       </div>
@@ -785,8 +820,12 @@ async function editDebtor(id) {
     `
     <div class="field"><label>Name</label>
       <input id="m_name" value="${esc(d.name)}" /></div>
-    <div class="field"><label>Email <span class="muted">(for reminders)</span></label>
-      <input id="m_email" type="email" value="${esc(d.email || "")}" placeholder="optional — juan@email.com" /></div>
+    <div class="field-row">
+      <div class="field"><label>Email <span class="muted">(reminders)</span></label>
+        <input id="m_email" type="email" value="${esc(d.email || "")}" placeholder="juan@email.com" /></div>
+      <div class="field"><label>Phone <span class="muted">(text)</span></label>
+        <input id="m_phone" type="tel" value="${esc(d.phone || "")}" placeholder="09xx xxx xxxx" /></div>
+    </div>
     <div class="field"><label>Total Debt (₱)</label>
       <input id="m_debt" type="number" min="0" value="${esc(d.totalDebt)}" /></div>
     <div class="field-row">
@@ -812,10 +851,11 @@ async function editDebtor(id) {
       const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
       const note = $("m_note").value.trim();
       const email = $("m_email").value.trim();
+      const phone = $("m_phone").value.trim();
       if (!name) return toast("Name is required.");
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      await DebtorsDB.put({ ...d, name, totalDebt, paymentRule, monthlyTarget, dueDate, note, email });
+      await DebtorsDB.put({ ...d, name, totalDebt, paymentRule, monthlyTarget, dueDate, note, email, phone });
       closeModal();
       toast("Updated.");
       currentDetailKey = normName(name); // follow a possible rename
@@ -964,6 +1004,7 @@ const DATA_HEADERS = [
   "Due Date",
   "Note",
   "Email",
+  "Phone",
 ];
 
 /** ISO timestamp -> "YYYY-MM-DD" using local date parts. */
@@ -990,13 +1031,14 @@ async function exportDataCSV() {
     const due = p.dueDate ? isoDay(p.dueDate) : "";
     const note = p.note || "";
     const email = p.email || "";
+    const phone = p.phone || "";
     const pays = [...p.payments].sort((a, b) => new Date(a.date) - new Date(b.date));
     if (pays.length) {
       pays.forEach((pay) =>
-        rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, isoDay(pay.date), pay.amount, due, note, email])
+        rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, isoDay(pay.date), pay.amount, due, note, email, phone])
       );
     } else {
-      rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, "", "", due, note, email]);
+      rows.push([p.name, p.totalDebt, p.monthlyTarget, rule, "", "", due, note, email, phone]);
     }
   });
 
@@ -1172,7 +1214,8 @@ async function importDataCSV(file) {
     iPa = col["payment amount"],
     iDue = col["due date"],
     iNote = col["note"],
-    iEmail = col["email"];
+    iEmail = col["email"],
+    iPhone = col["phone"];
 
   const persons = new Map();
   for (let r = 1; r < raw.length; r++) {
@@ -1189,6 +1232,7 @@ async function importDataCSV(file) {
         dueDate: iDue != null ? parseDateISO(row[iDue]) || "" : "",
         note: iNote != null ? String(row[iNote] || "").trim() : "",
         email: iEmail != null ? String(row[iEmail] || "").trim() : "",
+        phone: iPhone != null ? String(row[iPhone] || "").trim() : "",
         payments: [],
       });
     }
@@ -1254,6 +1298,7 @@ async function importDataCSV(file) {
       dueDate: p.dueDate || "",
       note: p.note || "",
       email: p.email || "",
+      phone: p.phone || "",
     });
     dCount++;
     for (const pay of p.payments) {
@@ -1336,6 +1381,9 @@ document.body.addEventListener("click", (e) => {
     case "remind":
       emailReminder(id);
       break;
+    case "text":
+      smsReminder(id);
+      break;
     case "view":
       showDetail(id);
       break;
@@ -1383,7 +1431,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.6";
+const APP_VERSION = "3.7";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
