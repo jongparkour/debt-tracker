@@ -51,6 +51,9 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - **App usage** = pageviews of `/`. **APK downloads** = pageviews of `/get-app.html` (Cloudflare's free tier has no click events, so `get-app.html` is a landing page that auto-starts the download; the download button + Settings QR + README all funnel through it).
 - View stats at Cloudflare dashboard → Web Analytics → hostname `iridescent-mooncake-68869c.netlify.app`.
 
+## Email reminders (optional, separate system)
+`reminders/AutoReminders.gs` + `reminders/SETUP.md` — a Google Apps Script + Sheet that emails debtors before/on/after due dates on a free daily schedule. Runs on Google's servers, independent of the app; contacts live in the Sheet. The app has no email field yet — add one (schema + Add/Edit modals + CSV column) if the user wants to enter contacts in the app and export them to the Sheet.
+
 ## Data & safety
 - All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.
 - CSV export/import is the backup path (headers include Due Date + Note as of v3.2).
