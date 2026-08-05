@@ -51,8 +51,11 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - **App usage** = pageviews of `/`. **APK downloads** = pageviews of `/get-app.html` (Cloudflare's free tier has no click events, so `get-app.html` is a landing page that auto-starts the download; the download button + Settings QR + README all funnel through it).
 - View stats at Cloudflare dashboard → Web Analytics → hostname `iridescent-mooncake-68869c.netlify.app`.
 
-## Email reminders (optional, separate system)
-`reminders/AutoReminders.gs` + `reminders/SETUP.md` — a Google Apps Script + Sheet that emails debtors before/on/after due dates on a free daily schedule. Runs on Google's servers, independent of the app; contacts live in the Sheet. The app has no email field yet — add one (schema + Add/Edit modals + CSV column) if the user wants to enter contacts in the app and export them to the Sheet.
+## Email reminders (opt-in sync)
+`reminders/AutoReminders.gs` (a Google Apps Script **Web App**) + `reminders/SETUP.md`.
+- The app has an **email** field on debtors (schema + Add/Edit modals + CSV "Email" column).
+- **Opt-in sync**: Settings → Auto reminders stores a Web App URL + secret (`dt_syncUrl`, `dt_syncToken`). With a URL set, `app.js` fire-and-forget POSTs (`postSync`, `mode:'no-cors'`, offline queue in `dt_syncQueue`) on **add/edit debtor** (`debtor_upsert`) and **add payment** (`payment_added`). No URL = nothing sent, app stays fully offline/private.
+- The Web App writes debtors to the Sheet, emails a **payment confirmation** on `payment_added`, and `sendReminders()` (two daily triggers, AM + PM) emails whoever is due. Free via Gmail. No free SMS (carriers charge).
 
 ## Data & safety
 - All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.

@@ -444,6 +444,19 @@
 
       <section class="settings-card">
         <div class="settings-card-head">
+          <div class="settings-card-icon">📧</div>
+          <div class="settings-card-title"><h2>Auto reminders</h2>
+            <p>Sync debtors to Google to auto-send email reminders + payment confirmations.</p></div>
+        </div>
+        <div class="field"><label>Sync URL <span class="muted">(Apps Script Web App)</span></label>
+          <input id="s_syncUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" /></div>
+        <div class="field"><label>Secret <span class="muted">(must match the script)</span></label>
+          <input id="s_syncToken" type="text" autocomplete="off" placeholder="a word only you know" /></div>
+        <p class="pin-help">Leave blank to keep everything on this device. Setup guide: <b>reminders/SETUP.md</b>.</p>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
           <div class="settings-card-icon">💬</div>
           <div class="settings-card-title"><h2>Feedback</h2>
             <p>Tell us what's working and what isn't.</p></div>
@@ -540,6 +553,15 @@
     hideAmt.checked = getHideAmounts();
     lockClose.addEventListener("change", markDirty);
     hideAmt.addEventListener("change", markDirty);
+
+    // ----- Auto-reminders sync config -----
+    const syncCfg = window.getSyncConfig ? getSyncConfig() : { url: "", token: "" };
+    const syncUrl = $("s_syncUrl"),
+      syncToken = $("s_syncToken");
+    syncUrl.value = syncCfg.url;
+    syncToken.value = syncCfg.token;
+    syncUrl.addEventListener("input", markDirty);
+    syncToken.addEventListener("input", markDirty);
 
     // ----- Biometrics (applied immediately) -----
     const bioBtn = $("s_bioBtn"),
@@ -687,6 +709,7 @@
       if (window.applyTheme) applyTheme(pendingTheme); // persist theme
       setLockOnClose(lockClose.checked);
       setHideAmounts(hideAmt.checked);
+      if (window.setSyncConfig) setSyncConfig(syncUrl.value, syncToken.value);
       sNew.value = "";
       sConf.value = "";
       validatePin();
@@ -707,6 +730,9 @@
       validatePin();
       lockClose.checked = getLockOnClose();
       hideAmt.checked = getHideAmounts();
+      const cfgNow = window.getSyncConfig ? getSyncConfig() : { url: "", token: "" };
+      syncUrl.value = cfgNow.url;
+      syncToken.value = cfgNow.token;
       save.disabled = true;
       setMsg("Changes discarded.");
     };

@@ -1,72 +1,87 @@
-# 📧 Automatic email reminders — setup (free, ~10 min)
+# 📧 Automatic email reminders + payment confirmations — setup (free, ~15 min)
 
-This sends your debtors a friendly **email reminder** before, on, and after their due
-date — **automatically, every day**, running on Google's servers (your phone/app can be
-off). It's **free** using your Gmail (about **100 emails/day** on a normal account).
+Once set up, the Debt Tracker app will **automatically**:
+- **Add each debtor to a Google Sheet** the moment you save them in the app,
+- **Email a confirmation** to a debtor when you record their payment,
+- **Email reminders MORNING and AFTERNOON** to anyone whose payment is due
+  (7/3/1 days before, on the due date, and while overdue).
 
-You'll set up two things: a **Google Sheet** (your debtor list) and a small **Apps
-Script** (`AutoReminders.gs`, in this folder) that emails from it.
+All free, using your Gmail (~100 emails/day), running on Google's servers even when
+your phone is off. Texts (SMS) can't be free — this is email-only.
 
----
-
-## 1. Make the Google Sheet
-1. Go to <https://sheets.google.com> → **Blank spreadsheet**.
-2. In **row 1**, type these exact headers, one per column:
-
-   | A | B | C | D | E |
-   |---|---|---|---|---|
-   | **Name** | **Email** | **Amount** | **Due Date** | **Log** |
-
-3. From **row 2** down, add one row per debtor, e.g.:
-
-   | Name | Email | Amount | Due Date | Log |
-   |------|-------|--------|----------|-----|
-   | Juan Dela Cruz | juan@email.com | 500 | 2026-08-15 | *(leave blank)* |
-
-   - **Due Date** must be a real date (type `2026-08-15` and it turns into a date).
-   - Leave **Log** empty — the script writes there so it never emails twice a day.
+> **Privacy note:** doing this means debtor **names, emails, amounts, and due dates
+> get sent to your Google Sheet** as you use the app. Without setup (blank Sync URL),
+> the app sends nothing and stays fully on your device.
 
 ---
 
-## 2. Add the script
+## 1. Create the Sheet
+1. Go to <https://sheets.google.com> → **Blank spreadsheet**. Name it e.g. "Debt Reminders".
+2. In **row 1** type these headers (columns A–G):
+
+   `Name | Email | Amount | Due Date | Log | Total | Paid`
+
+   *(Or skip this and run `setupSheet` in step 2 to fill the headers for you.)*
+   You don't type debtors here — the app fills them in. Leave **Log** empty (the script writes there).
+
+---
+
+## 2. Add the script + your secret
 1. In the Sheet: **Extensions → Apps Script**.
-2. Delete the sample `function myFunction() {}`.
-3. Open **`AutoReminders.gs`** (in this folder), copy **all** of it, paste into the editor.
-4. Click **💾 Save**.
+2. Delete the sample code, paste **all** of `AutoReminders.gs` (in this folder), **Save**.
+3. At the top, change `var SECRET = "changeme";` to a **word only you know**
+   (e.g. `"juan-2026-secret"`). Remember it — you'll paste the same word into the app.
+4. *(optional)* Run **`setupSheet`** once to write the header row.
 
 ---
 
-## 3. Test it
-1. In the toolbar function dropdown, pick **`sendTestEmail`** → **Run**.
-2. First run asks for permission → **Review permissions → choose your account →
-   Advanced → "Go to (project) (unsafe)" → Allow**. (It's "unsafe" only because it's
-   your own unpublished script — it just sends email as you.)
-3. Check your inbox for the test email. ✓
-4. Now pick **`sendReminders`** → **Run** to email anyone actually due today.
+## 3. Test email
+1. Function dropdown → **`sendTestEmail`** → **Run**.
+2. Approve the permission prompt: **Review permissions → your account → Advanced →
+   "Go to (project) (unsafe)" → Allow**. (It's your own script sending email as you.)
+3. Check your inbox for the test. ✓
 
 ---
 
-## 4. Turn on the daily automation
-1. Pick **`createDailyTrigger`** → **Run** (once).
-2. Done — from now on it runs **every day at 9 AM** and emails whoever is due.
-   (Check **⏰ Triggers** in the left sidebar to confirm.)
+## 4. Deploy as a Web App (this gives the app a URL to talk to)
+1. Top-right **Deploy → New deployment**.
+2. Gear ⚙️ next to "Select type" → **Web app**.
+3. Set **Execute as: Me**, and **Who has access: Anyone**. → **Deploy** → Authorize.
+4. Copy the **Web app URL** (ends in `/exec`).
+   - You can paste it in a browser to check — it should say *"Debt Tracker reminder endpoint is live."*
+
+> Re-deploying later (after editing the script): **Deploy → Manage deployments →
+> edit ✏️ → Version: New version → Deploy**. The URL stays the same.
+
+---
+
+## 5. Connect the app
+1. Open Debt Tracker → **⚙️ Settings → Auto reminders**.
+2. **Sync URL** = the `/exec` URL from step 4.
+3. **Secret** = the exact word you set in step 2.
+4. **Save changes**.
+5. Test it: **Add a debtor** (with an email) in the app → a row should appear in your
+   Sheet within seconds. Record a payment → the debtor gets a confirmation email.
+
+---
+
+## 6. Turn on the twice-daily reminders
+1. Back in Apps Script: function dropdown → **`createTriggers`** → **Run**.
+2. Done — reminders now go out every **morning (8 AM)** and **afternoon (2 PM)**.
+   Check the **⏰ Triggers** tab to confirm two entries.
 
 ---
 
 ## Customize (top of `AutoReminders.gs`)
-- `REMIND_DAYS_BEFORE = [7, 3, 1]` — remind 7, 3, and 1 day before due.
-- `REMIND_WHEN_OVERDUE = true` — keep reminding (once/day) after the due date.
-- `SEND_HOUR = 9` — change the time of day it runs.
-- `SENDER_NAME` — the "from" name recipients see.
-- Edit the `subject` / `body` text to reword the messages.
+- `REMIND_DAYS_BEFORE = [7, 3, 1]` — which days before due to remind.
+- `REMIND_WHEN_OVERDUE = true` — keep reminding after the due date.
+- `MORNING_HOUR = 8`, `AFTERNOON_HOUR = 14` — the two run times.
+- `SENDER_NAME`, and the `subject`/`body` text — reword the emails.
 
 ## Good to know
-- **Free limit:** ~100 emails/day (consumer Gmail) / 1,500 (Google Workspace). Fine for
-  personal use.
-- **Where data lives:** the debtor **names, emails, amounts, and due dates live in this
-  Google Sheet** (not on your phone). That's the trade-off for hands-off automation.
-- **Keeping it in sync with the app:** the Debt Tracker app doesn't store emails yet, so
-  you maintain this Sheet by hand. Ask Claude to *"add an email field + export"* to the
-  app if you'd rather type contacts there and paste them in.
-- **No SMS:** texts can't be sent for free (carriers charge the sender). This is
-  email-only by design.
+- **Free limit:** ~100 emails/day (Gmail) / 1,500 (Workspace).
+- **De-duplication:** the Log column stops repeat sends within the same AM/PM slot.
+- **Fully paid** debtors are skipped automatically (remaining ≤ 0).
+- **No app? Still works:** you can also just type debtors straight into the Sheet
+  (Name, Email, Amount, Due Date) — the reminders will still send.
+- **No SMS:** carriers charge the sender, so free auto-SMS isn't possible.
