@@ -1235,7 +1235,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.2.1";
+const APP_VERSION = "3.2.2";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
@@ -1249,8 +1249,31 @@ console.log(
   "font-size:12px;color:#94a3b8;font-style:italic;"
 );
 
+/* -------------------- Install promo -------------------- */
+
+/** True when the app is running as an installed app (PWA/TWA), not a browser tab. */
+function isInstalledApp() {
+  const mm = window.matchMedia;
+  const standalone =
+    mm &&
+    (mm("(display-mode: standalone)").matches ||
+      mm("(display-mode: fullscreen)").matches);
+  return (
+    standalone ||
+    window.navigator.standalone === true || // iOS "Add to Home Screen"
+    (document.referrer || "").startsWith("android-app://") // Android TWA
+  );
+}
+
+/** Hide the "Download the app" footer promo when they already have the app. */
+function updateApkPromo() {
+  const promo = $("apkPromo");
+  if (promo) promo.classList.toggle("hidden", isInstalledApp());
+}
+
 /* -------------------- Boot -------------------- */
 
 applyTheme(getTheme());
 updateOnlineStatus();
+updateApkPromo();
 loadDebtors(true);
