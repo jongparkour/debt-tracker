@@ -472,6 +472,18 @@ input:focus, textarea:focus, select:focus {
 .btn.tiny { padding: 6px 10px; font-size: 0.75rem; }
 .btn.primary { width: auto; }
 
+/* Payment receipt summary (shown after recording a payment) */
+.receipt-list { list-style: none; margin: 0 0 4px; padding: 0; }
+.receipt-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.receipt-list li span { color: var(--muted); }
+
 /* Import dialogs: duplicate list + choice buttons */
 .dup-list { margin: 8px 0; padding-left: 20px; }
 .dup-list li { margin: 2px 0; }

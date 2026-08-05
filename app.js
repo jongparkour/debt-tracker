@@ -209,6 +209,106 @@ async function smsReminder(repId) {
   window.location.href = "sms:" + num + sep + "body=" + encodeURIComponent(body);
 }
 
+/** Build a payment-receipt message: this payment + today/week/month/overall totals. */
+function receiptText(person, paymentAmount) {
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const weekStart = new Date(todayStart);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const sumSince = (start) =>
+    person.payments
+      .filter((p) => new Date(p.date) >= start)
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  const today = sumSince(todayStart);
+  const week = sumSince(weekStart);
+  const month = sumSince(monthStart);
+  const paid = person.paid;
+  const total = person.totalDebt;
+  const remaining = Math.max(0, person.remaining);
+  const amt = peso(paymentAmount);
+  const settled = remaining <= 0;
+
+  const emailBody =
+    `Hi ${person.name},\n\n` +
+    `Payment received: ${amt} on ${fmtDate(now.toISOString())}.\n\n` +
+    `Summary\n` +
+    `• Today: ${peso(today)}\n` +
+    `• This week: ${peso(week)}\n` +
+    `• This month: ${peso(month)}\n` +
+    `• Total paid: ${peso(paid)} of ${peso(total)}\n` +
+    `• Remaining balance: ${peso(remaining)}` +
+    (settled ? " — fully paid ✓" : "") +
+    `\n\nThank you!`;
+
+  const smsBody =
+    `Hi ${person.name}, received ${amt}. Paid ${peso(paid)}/${peso(total)}, bal ${peso(
+      remaining
+    )}. Today ${peso(today)}, wk ${peso(week)}, mo ${peso(month)}.` +
+    (settled ? " Fully paid, thanks!" : " Thank you!");
+
+  const summaryHtml = `
+    <p class="muted" style="margin:0 0 12px;">Receipt for <b>${esc(
+      person.name
+    )}</b> — payment of <b>${amt}</b>.</p>
+    <ul class="receipt-list">
+      <li><span>Today</span><b>${peso(today)}</b></li>
+      <li><span>This week</span><b>${peso(week)}</b></li>
+      <li><span>This month</span><b>${peso(month)}</b></li>
+      <li><span>Total paid</span><b>${peso(paid)} / ${peso(total)}</b></li>
+      <li><span>Remaining</span><b class="${settled ? "" : ""}">${peso(remaining)}${
+    settled ? " ✓" : ""
+  }</b></li>
+    </ul>`;
+
+  return {
+    email: { subject: `Payment received — ${amt}`, body: emailBody },
+    sms: { body: smsBody },
+    summaryHtml,
+  };
+}
+
+/** After a payment: show a receipt card with tap-to-send Email / Text buttons. */
+function showPaymentReceipt(person, paymentAmount) {
+  const r = receiptText(person, paymentAmount);
+  const emailBtn = person.email
+    ? `<button class="btn primary" id="rc_email">✉️ Email receipt</button>`
+    : "";
+  const smsBtn = person.phone
+    ? `<button class="btn" id="rc_sms">💬 Text receipt</button>`
+    : "";
+
+  openModal(
+    "Payment recorded ✓",
+    `${r.summaryHtml}<div class="choice-actions">${emailBtn}${smsBtn}</div>`,
+    null
+  );
+  $("modalSave").style.display = "none";
+  $("modalCancel").textContent = "Done";
+
+  if (person.email) {
+    $("rc_email").addEventListener("click", () => {
+      window.location.href =
+        "mailto:" +
+        encodeURIComponent(person.email) +
+        "?subject=" +
+        encodeURIComponent(r.email.subject) +
+        "&body=" +
+        encodeURIComponent(r.email.body);
+    });
+  }
+  if (person.phone) {
+    $("rc_sms").addEventListener("click", () => {
+      const num = String(person.phone).replace(/[^\d+]/g, "");
+      const sep = /iP(hone|od|ad)/.test(navigator.userAgent) ? "&" : "?";
+      window.location.href = "sms:" + num + sep + "body=" + encodeURIComponent(r.sms.body);
+    });
+  }
+}
+
 /** Push a person's current state to the sheet; pass amount to also confirm a payment. */
 async function syncDebtorById(repId, paymentAmount) {
   const cfg = getSyncConfig();
@@ -413,8 +513,11 @@ async function addPayment(debtorId, amount, dateISO) {
     date: dateISO || new Date().toISOString(),
   });
   toast("Payment recorded.");
-  syncDebtorById(debtorId, amt); // sends the payment-confirmation email (if sync is set up)
+  syncDebtorById(debtorId, amt); // Pro: auto-confirmation email (if sync is set up)
+  const person = await personFromRep(debtorId);
   refreshCurrentView();
+  // Offer a tap-to-send receipt (email / text) with the running summary.
+  if (person && (person.email || person.phone)) showPaymentReceipt(person, amt);
 }
 
 /** Popup to record a payment with a chosen amount + date. */
@@ -805,9 +908,10 @@ function closeModal() {
   $("modalOverlay").classList.add("hidden");
   document.body.classList.remove("modal-open");
   $("modalBody").innerHTML = "";
-  // Restore the footer Save button to its default (dialogs above may hide/rename it).
+  // Restore the footer buttons to their defaults (dialogs above may hide/rename them).
   $("modalSave").style.display = "";
   $("modalSave").textContent = "Save";
+  $("modalCancel").textContent = "Cancel";
   modalSaveHandler = null;
 }
 
@@ -1431,7 +1535,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.7";
+const APP_VERSION = "3.8";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
