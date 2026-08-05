@@ -446,17 +446,12 @@
         <div class="settings-card-head">
           <div class="settings-card-icon">📧</div>
           <div class="settings-card-title"><h2>Auto reminders <span class="pro-badge">PRO</span></h2>
-            <p>By default, tap <b>✉️ Remind</b> on any debtor to send an email in one tap.
-               Pro adds <b>fully automatic</b> reminders + payment confirmations via Google (one-time setup).</p></div>
+            <p>Free: tap <b>✉️</b> / <b>💬</b> on any debtor to send a reminder in one tap.
+               <b>Pro</b> would send them <b>fully automatically</b> — reminders + payment
+               confirmations, even when your phone is off.</p></div>
         </div>
-        <details class="more-fields">
-          <summary>Set up Pro automation</summary>
-          <div class="field"><label>Sync URL <span class="muted">(Apps Script Web App)</span></label>
-            <input id="s_syncUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" /></div>
-          <div class="field"><label>Secret <span class="muted">(must match the script)</span></label>
-            <input id="s_syncToken" type="text" autocomplete="off" placeholder="a word only you know" /></div>
-          <p class="pin-help">Leave blank to keep everything on this device. Guide: <b>reminders/SETUP.md</b>.</p>
-        </details>
+        <button type="button" class="btn primary" id="s_proBtn" style="width:100%;">⚡ Upgrade to Pro</button>
+        <p class="pin-help">Tapping this sends a request for full automation. We'll turn it on once enough people ask.</p>
       </section>
 
       <section class="settings-card">
@@ -558,14 +553,32 @@
     lockClose.addEventListener("change", markDirty);
     hideAmt.addEventListener("change", markDirty);
 
-    // ----- Auto-reminders sync config -----
-    const syncCfg = window.getSyncConfig ? getSyncConfig() : { url: "", token: "" };
-    const syncUrl = $("s_syncUrl"),
-      syncToken = $("s_syncToken");
-    syncUrl.value = syncCfg.url;
-    syncToken.value = syncCfg.token;
-    syncUrl.addEventListener("input", markDirty);
-    syncToken.addEventListener("input", markDirty);
+    // ----- Upgrade to Pro (request full automation) -----
+    const proBtn = $("s_proBtn");
+    const proDone = () => {
+      proBtn.textContent = "✓ Pro requested";
+    };
+    if (localStorage.getItem("dt_proRequested") === "1") proDone();
+    proBtn.addEventListener("click", () => {
+      if (localStorage.getItem("dt_proRequested") === "1") {
+        if (window.toast) toast("You've already requested Pro — thank you!");
+        return;
+      }
+      // Register the request as a counted pageview (Cloudflare), staying in the app.
+      const w = window.open("./pro-request.html", "_blank");
+      if (!w) {
+        const ifr = document.createElement("iframe");
+        ifr.style.display = "none";
+        ifr.src = "./pro-request.html";
+        document.body.appendChild(ifr);
+        setTimeout(() => {
+          try { ifr.remove(); } catch (e) {}
+        }, 5000);
+      }
+      try { localStorage.setItem("dt_proRequested", "1"); } catch (e) {}
+      proDone();
+      if (window.toast) toast("Thanks! Your request for full automation was recorded.");
+    });
 
     // ----- Biometrics (applied immediately) -----
     const bioBtn = $("s_bioBtn"),
@@ -713,7 +726,6 @@
       if (window.applyTheme) applyTheme(pendingTheme); // persist theme
       setLockOnClose(lockClose.checked);
       setHideAmounts(hideAmt.checked);
-      if (window.setSyncConfig) setSyncConfig(syncUrl.value, syncToken.value);
       sNew.value = "";
       sConf.value = "";
       validatePin();
@@ -734,9 +746,6 @@
       validatePin();
       lockClose.checked = getLockOnClose();
       hideAmt.checked = getHideAmounts();
-      const cfgNow = window.getSyncConfig ? getSyncConfig() : { url: "", token: "" };
-      syncUrl.value = cfgNow.url;
-      syncToken.value = cfgNow.token;
       save.disabled = true;
       setMsg("Changes discarded.");
     };

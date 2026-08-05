@@ -51,11 +51,14 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - **App usage** = pageviews of `/`. **APK downloads** = pageviews of `/get-app.html` (Cloudflare's free tier has no click events, so `get-app.html` is a landing page that auto-starts the download; the download button + Settings QR + README all funnel through it).
 - View stats at Cloudflare dashboard → Web Analytics → hostname `iridescent-mooncake-68869c.netlify.app`.
 
-## Email reminders (opt-in sync)
-`reminders/AutoReminders.gs` (a Google Apps Script **Web App**) + `reminders/SETUP.md`.
-- The app has an **email** field on debtors (schema + Add/Edit modals + CSV "Email" column).
-- **Opt-in sync**: Settings → Auto reminders stores a Web App URL + secret (`dt_syncUrl`, `dt_syncToken`). With a URL set, `app.js` fire-and-forget POSTs (`postSync`, `mode:'no-cors'`, offline queue in `dt_syncQueue`) on **add/edit debtor** (`debtor_upsert`) and **add payment** (`payment_added`). No URL = nothing sent, app stays fully offline/private.
-- The Web App writes debtors to the Sheet, emails a **payment confirmation** on `payment_added`, and `sendReminders()` (two daily triggers, AM + PM) emails whoever is due. Free via Gmail. No free SMS (carriers charge).
+## Reminders — free tier + Pro (deferred)
+**Free (live):** debtors have **email** + **phone** fields; tap **✉️/💬** on a debtor to send a reminder via `mailto:`/`sms:` (pre-filled). Recording a payment shows a **receipt** modal (today/week/month/overall + remaining) with tap-to-send Email/Text. All on-device, free, private.
+
+**Pro (built but NOT wired yet — waiting for demand):**
+- Settings → Auto reminders shows an **"⚡ Upgrade to Pro"** button (no setup fields). Tapping it opens `pro-request.html` (a Cloudflare-beacon page) → **pageviews of `/pro-request.html` = number of Pro requests**. A local `dt_proRequested` flag stops repeat taps. **When it reaches ~10, build the central automation.**
+- The full automation code is ready: `reminders/AutoReminders.gs` (Apps Script **Web App**: `doPost` upsert + payment-confirmation email + AM/PM reminder triggers, branded HTML emails) + `reminders/SETUP.md`.
+- The app's sync plumbing is **dormant** in `app.js` (`getSyncConfig`/`postSync`/`syncDebtorById`, offline queue `dt_syncQueue`) — it no-ops because no URL is set. To turn Pro on, re-add a URL source (central endpoint) and the Settings fields, then deploy `AutoReminders.gs`.
+- No free SMS (carriers charge the sender).
 
 ## Data & safety
 - All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.
