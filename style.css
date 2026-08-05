@@ -330,10 +330,11 @@ body {
   font-weight: 600;
 }
 .page-actions .icon-btn {
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: none;
+  border: none;
   color: var(--ink);
 }
+.page-actions .icon-btn:active { background: none; }
 
 /* ---------- Dashboard: hero + secondary stats ---------- */
 .dashboard {
