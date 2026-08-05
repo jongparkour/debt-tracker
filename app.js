@@ -179,9 +179,9 @@ async function emailReminder(repId) {
   const amt = peso(person.remaining);
   const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
   const subject = `Payment reminder — ${amt}`;
-  let body = `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}`;
+  let body = emailBrand("PAYMENT REMINDER") + `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}`;
   if (dueStr) body += `, due on ${dueStr}`;
-  body += `.\n\nThank you!`;
+  body += `.\n\nThank you!` + EMAIL_SIGN;
   window.location.href =
     "mailto:" +
     encodeURIComponent(person.email) +
@@ -208,6 +208,12 @@ async function smsReminder(repId) {
   const sep = /iP(hone|od|ad)/.test(navigator.userAgent) ? "&" : "?";
   window.location.href = "sms:" + num + sep + "body=" + encodeURIComponent(body);
 }
+
+/** Branded plain-text header/footer for mailto emails (mailto can't do HTML/images). */
+function emailBrand(title) {
+  return "💰  DEBT TRACKER\n━━━━━━━━━━━━━━━━━━━━━━━━\n" + title + "\n\n";
+}
+const EMAIL_SIGN = "\n\n—\nSent with Debt Tracker";
 
 /** Build a payment-receipt message: this payment + today/week/month/overall totals. */
 function receiptText(person, paymentAmount) {
@@ -237,6 +243,7 @@ function receiptText(person, paymentAmount) {
     : `*** REMAINING BALANCE TO PAY: ${peso(remaining)} ***`;
 
   const emailBody =
+    emailBrand("PAYMENT RECEIPT") +
     `Hi ${person.name},\n\n` +
     `Payment received: ${amt} on ${fmtDate(now.toISOString())}.\n\n` +
     `${remainingLine}\n\n` +
@@ -245,7 +252,8 @@ function receiptText(person, paymentAmount) {
     `• This week: ${peso(week)}\n` +
     `• This month: ${peso(month)}\n` +
     `• Total paid: ${peso(paid)} of ${peso(total)}\n\n` +
-    `Thank you!`;
+    `Thank you!` +
+    EMAIL_SIGN;
 
   const smsBody = settled
     ? `Hi ${person.name}, received ${amt}. FULLY PAID ✓ — no remaining balance. Thank you!`
@@ -1539,7 +1547,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.8.2";
+const APP_VERSION = "3.9";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

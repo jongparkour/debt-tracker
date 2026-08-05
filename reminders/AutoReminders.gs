@@ -75,17 +75,24 @@ function sendPaymentConfirmation(d) {
   if (!d.email) return;
   var amt = peso_(d.amount);
   var rem = peso_(d.remaining);
-  var subject, body;
-  if (Number(d.remaining) <= 0) {
-    subject = "Payment received — fully paid ✓";
-    body = "Hi " + d.name + ",\n\nWe've received your payment of " + amt
-      + ". Your balance is now fully paid. Thank you!";
-  } else {
-    subject = "Payment received — " + amt;
-    body = "Hi " + d.name + ",\n\nWe've received your payment of " + amt
-      + ". Your remaining balance is " + rem + ".\n\nThank you!";
-  }
-  MailApp.sendEmail({ to: d.email, subject: subject, body: body, name: SENDER_NAME });
+  var settled = Number(d.remaining) <= 0;
+  var subject = settled ? "Payment received — fully paid ✓" : "Payment received — " + amt;
+
+  var inner =
+    '<p style="margin:0 0 10px;">Hi ' + escapeHtml_(d.name) + ',</p>' +
+    '<p style="margin:0 0 4px;">We’ve received your payment of <b>' + amt + '</b>.</p>' +
+    balBox_(settled ? "FULLY PAID ✓ — no remaining balance"
+                    : "REMAINING BALANCE TO PAY: " + rem, settled) +
+    '<p style="margin:10px 0 0;">Thank you!</p>';
+
+  var plain = "Hi " + d.name + ",\n\nWe've received your payment of " + amt + ".\n\n" +
+    (settled ? "FULLY PAID — no remaining balance." : "REMAINING BALANCE TO PAY: " + rem) +
+    "\n\nThank you!";
+
+  MailApp.sendEmail({
+    to: d.email, subject: subject, name: SENDER_NAME,
+    htmlBody: htmlEmail_("Payment receipt", inner), body: plain,
+  });
 }
 
 /* ================= Daily reminders (morning + afternoon) ================= */
@@ -122,23 +129,29 @@ function sendReminders() {
 
     var amt = peso_(remaining);
     var dueStr = Utilities.formatDate(due, tz, "MMM d, yyyy");
-    var subject, body;
+    var subject, lead, plainLead;
     if (when === "overdue") {
       subject = "Payment overdue — " + amt;
-      body = "Hi " + name + ",\n\nFriendly reminder that your balance of " + amt
-        + " was due on " + dueStr + " and is now overdue. Please settle it when you can.\n\nThank you!";
+      lead = "Friendly reminder that your balance was due on " + dueStr + " and is now <b>overdue</b>. Please settle it when you can.";
+      plainLead = "Friendly reminder that your balance of " + amt + " was due on " + dueStr + " and is now overdue.";
     } else if (when === "due today") {
       subject = "Payment due today — " + amt;
-      body = "Hi " + name + ",\n\nReminder: your balance of " + amt
-        + " is due today (" + dueStr + ").\n\nThank you!";
+      lead = "Reminder: your balance is <b>due today</b> (" + dueStr + ").";
+      plainLead = "Reminder: your balance of " + amt + " is due today (" + dueStr + ").";
     } else {
       subject = "Upcoming payment — " + amt;
-      body = "Hi " + name + ",\n\nFriendly reminder: your balance of " + amt
-        + " is due on " + dueStr + ".\n\nThank you!";
+      lead = "Friendly reminder: your balance is due on <b>" + dueStr + "</b>.";
+      plainLead = "Friendly reminder: your balance of " + amt + " is due on " + dueStr + ".";
     }
+    var inner = '<p style="margin:0 0 10px;">Hi ' + escapeHtml_(name) + ',</p>' +
+      '<p style="margin:0 0 4px;">' + lead + '</p>' +
+      balBox_("BALANCE DUE: " + amt, false) +
+      '<p style="margin:10px 0 0;">Thank you!</p>';
+    var plain = "Hi " + name + ",\n\n" + plainLead + "\n\nBALANCE DUE: " + amt + "\n\nThank you!";
 
     try {
-      MailApp.sendEmail({ to: email, subject: subject, body: body, name: SENDER_NAME });
+      MailApp.sendEmail({ to: email, subject: subject, name: SENDER_NAME,
+        htmlBody: htmlEmail_("Payment reminder", inner), body: plain });
       logCell.setValue((prevLog ? prevLog + "; " : "") + stamp + " (" + when + ")");
       sent++;
     } catch (e) {
@@ -180,6 +193,30 @@ function sendTestEmail() {
 /* ================= Small helpers ================= */
 
 function getSheet() { return SpreadsheetApp.getActiveSpreadsheet().getSheets()[0]; }
+
+/** Branded HTML email in the app's navy/teal skin. `inner` is the body HTML. */
+function htmlEmail_(heading, inner) {
+  return '' +
+    '<div style="font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;max-width:480px;margin:0 auto;' +
+      'border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">' +
+      '<div style="background:linear-gradient(135deg,#0f766e,#115e59);color:#ffffff;padding:22px 24px;">' +
+        '<div style="font-size:22px;font-weight:800;">💰 Debt Tracker</div>' +
+        '<div style="font-size:13px;opacity:0.85;margin-top:3px;">' + heading + '</div>' +
+      '</div>' +
+      '<div style="padding:22px 24px;background:#ffffff;color:#0f172a;font-size:15px;line-height:1.5;">' + inner + '</div>' +
+      '<div style="padding:12px 24px;background:#f8fafc;color:#94a3b8;font-size:12px;">Sent with Debt Tracker</div>' +
+    '</div>';
+}
+/** Emphasized balance pill: green when settled, red when a balance remains. */
+function balBox_(text, ok) {
+  var bg = ok ? '#ecfdf5' : '#fff1f2';
+  var fg = ok ? '#047857' : '#be123c';
+  return '<div style="margin:14px 0;padding:12px 14px;border-radius:10px;font-weight:700;' +
+    'text-align:center;background:' + bg + ';color:' + fg + ';">' + text + '</div>';
+}
+function escapeHtml_(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 function textOut(s) {
   return ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.TEXT);
 }
