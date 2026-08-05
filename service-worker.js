@@ -2,7 +2,7 @@
    service-worker.js — offline caching
    ============================================================ */
 
-const CACHE = "debt-tracker-v44";
+const CACHE = "debt-tracker-v45";
 
 // Relative paths so it works whether hosted at "/" or a subfolder.
 const ASSETS = [

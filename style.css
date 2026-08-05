@@ -1102,6 +1102,14 @@ body.modal-open { overflow: hidden; }
 /* Feedback char counter */
 .char-count { text-align: right; font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
 
+/* Inline field validation (e.g. empty feedback) */
+.input-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.14);
+}
+.input-error:focus { outline-color: var(--danger) !important; border-color: var(--danger) !important; }
+.field-error { color: var(--danger); font-size: 0.76rem; margin: 6px 2px 0; }
+
 /* Share: install QR code */
 .qr-box { margin-top: 16px; text-align: center; }
 .qr-img {

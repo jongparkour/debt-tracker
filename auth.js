@@ -451,7 +451,7 @@
                confirmations, even when your phone is off.</p></div>
         </div>
         <button type="button" class="btn primary" id="s_proBtn" style="width:100%;">⚡ Upgrade to Pro</button>
-        <p class="pin-help">Tapping this sends a request for full automation. We'll turn it on once enough people ask.</p>
+        <p class="pin-help">Pro will be a small paid add-on (price still being set). Tapping this just sends a request — no charge yet. We'll enable it and set fair pricing once enough people ask.</p>
       </section>
 
       <section class="settings-card">
@@ -463,6 +463,7 @@
         <div class="field">
           <textarea id="s_feedback" rows="4" maxlength="1000" placeholder="Share an idea or report a problem…"></textarea>
           <div class="char-count"><span id="s_fbCount">0</span>/1000</div>
+          <p class="field-error hidden" id="s_fbErr">Please type your feedback first.</p>
         </div>
         <button type="button" class="btn" id="s_feedbackBtn" style="width:100%;">✉️ Send feedback</button>
       </section>
@@ -690,13 +691,21 @@
 
     // ----- Feedback (opens the email app) -----
     const fb = $("s_feedback"),
-      fbCount = $("s_fbCount");
+      fbCount = $("s_fbCount"),
+      fbErr = $("s_fbErr");
     fb.addEventListener("input", () => {
       fbCount.textContent = fb.value.length;
+      fb.classList.remove("input-error");
+      fbErr.classList.add("hidden");
     });
     $("s_feedbackBtn").addEventListener("click", () => {
       const text = fb.value.trim();
-      if (!text) return setMsg("Type your suggestion first.");
+      if (!text) {
+        fb.classList.add("input-error");
+        fbErr.classList.remove("hidden");
+        fb.focus();
+        return;
+      }
       const subject = "Debt Tracker feedback (v" + (window.APP_VERSION || "1") + ")";
       window.location.href =
         "mailto:" +
