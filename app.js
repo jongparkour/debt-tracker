@@ -244,11 +244,12 @@ function receiptText(person, paymentAmount) {
     (settled ? " — fully paid ✓" : "") +
     `\n\nThank you!`;
 
-  const smsBody =
-    `Hi ${person.name}, received ${amt}. Paid ${peso(paid)}/${peso(total)}, bal ${peso(
-      remaining
-    )}. Today ${peso(today)}, wk ${peso(week)}, mo ${peso(month)}.` +
-    (settled ? " Fully paid, thanks!" : " Thank you!");
+  const smsBody = settled
+    ? `Hi ${person.name}, received ${amt}. FULLY PAID ✓ — no remaining balance. Thank you!`
+    : `Hi ${person.name}, received ${amt}. REMAINING BALANCE TO PAY: ${peso(remaining)}. ` +
+      `(Paid ${peso(paid)} of ${peso(total)}. Today ${peso(today)}, wk ${peso(week)}, mo ${peso(
+        month
+      )}.) Thank you!`;
 
   const summaryHtml = `
     <p class="muted" style="margin:0 0 12px;">Receipt for <b>${esc(
@@ -1535,7 +1536,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.8";
+const APP_VERSION = "3.8.1";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
