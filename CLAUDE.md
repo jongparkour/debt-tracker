@@ -24,6 +24,9 @@ Opens http://localhost:8080/ (service workers + biometrics need HTTP, not `file:
 - Build the ZIP with: `powershell -ExecutionPolicy Bypass -File .\build-zip.ps1` (outputs to `~/Downloads/debt-tracker-deploy.zip`).
 - Installed apps (TWA/PWA) pick up changes after the service-worker cache bump, on the next reopen.
 
+## When the user says "continue the project" / "prepare to deploy"
+Proactively run `build-zip.ps1` so a fresh `~/Downloads/debt-tracker-deploy.zip` is ready, then tell the user to drag it onto the Netlify **Deploys** tab. Claude can *build* the ZIP but **cannot upload to Netlify** — that drag-and-drop is the user's manual step.
+
 ## Release checklist (do all three, every release)
 1. `APP_VERSION` in `app.js`
 2. footer version string in `index.html`
