@@ -46,6 +46,11 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - Download links: site footer `./debt-tracker.apk`; GitHub `raw/main/debt-tracker.apk`. The footer promo auto-hides when running as an installed PWA/TWA (`isInstalledApp()` in app.js).
 - The Android "unknown sources" + browser "harmful file" warnings are inherent to sideloading; only the Play Store removes them.
 
+## Analytics (Cloudflare Web Analytics — cookieless)
+- Beacon (token `6e128fc0e8d84f66aa7cfa9da3234949`) is in `index.html` and `get-app.html`. Only anonymous pageviews are sent; no debtor data ever leaves the device.
+- **App usage** = pageviews of `/`. **APK downloads** = pageviews of `/get-app.html` (Cloudflare's free tier has no click events, so `get-app.html` is a landing page that auto-starts the download; the download button + Settings QR + README all funnel through it).
+- View stats at Cloudflare dashboard → Web Analytics → hostname `iridescent-mooncake-68869c.netlify.app`.
+
 ## Data & safety
 - All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.
 - CSV export/import is the backup path (headers include Due Date + Note as of v3.2).

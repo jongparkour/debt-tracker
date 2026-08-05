@@ -604,8 +604,8 @@
     });
 
     // ----- Share: QR code to install the APK (generated offline) -----
-    const APK_URL =
-      "https://github.com/jongparkour/debt-tracker/raw/main/debt-tracker.apk";
+    const SHARE_URL =
+      "https://iridescent-mooncake-68869c.netlify.app/get-app.html";
     const qrBtn = $("s_qrBtn");
     const qrWrap = $("s_qrWrap");
     let qrBuilt = false;
@@ -619,7 +619,7 @@
       if (!qrBuilt) {
         try {
           const qr = window.qrcode(0, "M");
-          qr.addData(APK_URL);
+          qr.addData(SHARE_URL);
           qr.make();
           $("s_qrImg").innerHTML = qr.createImgTag(5, 16, "Install Debt Tracker");
           qrBuilt = true;
@@ -633,7 +633,7 @@
     });
     $("s_qrCopy").addEventListener("click", async () => {
       try {
-        await navigator.clipboard.writeText(APK_URL);
+        await navigator.clipboard.writeText(SHARE_URL);
         if (window.toast) toast("Install link copied.");
       } catch (e) {
         setMsg("Couldn't copy — long-press the QR's link instead.");
@@ -644,7 +644,7 @@
       show(qrShare);
       qrShare.addEventListener("click", () => {
         navigator
-          .share({ title: "Debt Tracker", text: "Install Debt Tracker:", url: APK_URL })
+          .share({ title: "Debt Tracker", text: "Install Debt Tracker:", url: SHARE_URL })
           .catch(() => {});
       });
     }
