@@ -169,6 +169,33 @@ async function personFromRep(repId) {
   return buildPersons(debtors, pays).find((p) => p.key === normName(rep.name)) || null;
 }
 
+/** Weekly/monthly expectation from a debtor's Expected Monthly Payment (monthlyTarget).
+ *  Weekly expected = monthly / 4. Returns null if no monthly target is set. */
+function expectations(person) {
+  const target = Number(person.monthlyTarget) || 0;
+  if (!(target > 0)) return null;
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sumSince = (start) =>
+    person.payments
+      .filter((p) => new Date(p.date) >= start)
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const weekPaid = sumSince(weekStart);
+  const monthPaid = sumSince(monthStart);
+  const weekly = Math.round(target / 4);
+  return {
+    target,
+    weekly,
+    weekPaid,
+    monthPaid,
+    weekToGo: Math.max(0, weekly - weekPaid),
+    monthToGo: Math.max(0, target - monthPaid),
+  };
+}
+
 /** Tap-to-send email: opens the phone's email app with a reminder pre-filled. */
 async function emailReminder(repId) {
   const person = await personFromRep(repId);
@@ -181,7 +208,19 @@ async function emailReminder(repId) {
   const subject = `Payment reminder — ${amt}`;
   let body = emailBrand("PAYMENT REMINDER") + `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}`;
   if (dueStr) body += `, due on ${dueStr}`;
-  body += `.\n\nThank you!` + EMAIL_SIGN;
+  body += `.\n`;
+  const exp = expectations(person);
+  if (exp) {
+    body +=
+      `\nExpected payments\n` +
+      `• This week: ${peso(exp.weekly)} expected — ${peso(exp.weekPaid)} paid` +
+      (exp.weekToGo > 0 ? `, ${peso(exp.weekToGo)} to go` : ` ✓`) +
+      `\n` +
+      `• This month: ${peso(exp.target)} expected — ${peso(exp.monthPaid)} paid` +
+      (exp.monthToGo > 0 ? `, ${peso(exp.monthToGo)} to go` : ` ✓`) +
+      `\n`;
+  }
+  body += `\nThank you!` + EMAIL_SIGN;
   window.location.href =
     "mailto:" +
     encodeURIComponent(person.email) +
@@ -200,9 +239,15 @@ async function smsReminder(repId) {
 
   const amt = peso(person.remaining);
   const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
-  const body = `Hi ${person.name}, reminder: ${amt} balance${
+  let body = `Hi ${person.name}, reminder: ${amt} balance${
     dueStr ? " due " + dueStr : ""
-  }. Thank you!`;
+  }.`;
+  const exp = expectations(person);
+  if (exp) {
+    body += ` Weekly expected ${peso(exp.weekly)}`;
+    body += exp.weekToGo > 0 ? ` (${peso(exp.weekToGo)} to go).` : ` (met ✓).`;
+  }
+  body += ` Thank you!`;
   const num = String(person.phone).replace(/[^\d+]/g, "");
   // iOS wants "&body="; Android wants "?body=".
   const sep = /iP(hone|od|ad)/.test(navigator.userAgent) ? "&" : "?";
@@ -1547,7 +1592,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.9.1";
+const APP_VERSION = "3.9.2";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
