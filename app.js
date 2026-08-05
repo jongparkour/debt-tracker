@@ -161,6 +161,32 @@ function flushSyncQueue() {
   );
 }
 
+/** Tap-to-send: open the phone's email app with a reminder pre-filled (free, private). */
+async function emailReminder(repId) {
+  const rep = await DebtorsDB.get(repId);
+  if (!rep) return;
+  const [debtors, pays] = await Promise.all([DebtorsDB.getAll(), PaymentsDB.getAll()]);
+  const person = buildPersons(debtors, pays).find((p) => p.key === normName(rep.name));
+  if (!person) return;
+  if (!person.email) {
+    toast("Add an email for this debtor first (Edit).");
+    return;
+  }
+  const amt = peso(Math.max(0, person.remaining));
+  const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
+  const subject = `Payment reminder — ${amt}`;
+  let body = `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}`;
+  if (dueStr) body += `, due on ${dueStr}`;
+  body += `.\n\nThank you!`;
+  window.location.href =
+    "mailto:" +
+    encodeURIComponent(person.email) +
+    "?subject=" +
+    encodeURIComponent(subject) +
+    "&body=" +
+    encodeURIComponent(body);
+}
+
 /** Push a person's current state to the sheet; pass amount to also confirm a payment. */
 async function syncDebtorById(repId, paymentAmount) {
   const cfg = getSyncConfig();
@@ -523,6 +549,11 @@ async function loadDebtors(animateCards = false) {
                 p.name
               )}">+ Pay</button>`
         }
+        ${
+          !settled && p.email
+            ? `<button class="btn small" data-act="remind" data-id="${p.payToId}">✉️ Remind</button>`
+            : ""
+        }
         <button class="btn small ghost" data-act="delperson" data-id="${p.payToId}">Delete</button>
       </div>
     `;
@@ -696,6 +727,12 @@ async function showDetail(repId) {
       <div class="add-pay">
         <button class="btn primary" data-act="paymodal" data-id="${person.payToId}"
                 data-name="${esc(person.name)}" style="width:100%;">+ Record Payment</button>
+        ${
+          person.remaining > 0
+            ? `<button class="btn" data-act="remind" data-id="${person.payToId}"
+                 style="width:100%;margin-top:8px;">✉️ Send email reminder</button>`
+            : ""
+        }
       </div>
     </div>
 
@@ -1296,6 +1333,9 @@ document.body.addEventListener("click", (e) => {
     case "paymodal":
       openPaymentModal(id, btn.dataset.name || "");
       break;
+    case "remind":
+      emailReminder(id);
+      break;
     case "view":
       showDetail(id);
       break;
@@ -1343,7 +1383,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.5";
+const APP_VERSION = "3.6";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

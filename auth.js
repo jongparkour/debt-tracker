@@ -445,14 +445,18 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">📧</div>
-          <div class="settings-card-title"><h2>Auto reminders</h2>
-            <p>Sync debtors to Google to auto-send email reminders + payment confirmations.</p></div>
+          <div class="settings-card-title"><h2>Auto reminders <span class="pro-badge">PRO</span></h2>
+            <p>By default, tap <b>✉️ Remind</b> on any debtor to send an email in one tap.
+               Pro adds <b>fully automatic</b> reminders + payment confirmations via Google (one-time setup).</p></div>
         </div>
-        <div class="field"><label>Sync URL <span class="muted">(Apps Script Web App)</span></label>
-          <input id="s_syncUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" /></div>
-        <div class="field"><label>Secret <span class="muted">(must match the script)</span></label>
-          <input id="s_syncToken" type="text" autocomplete="off" placeholder="a word only you know" /></div>
-        <p class="pin-help">Leave blank to keep everything on this device. Setup guide: <b>reminders/SETUP.md</b>.</p>
+        <details class="more-fields">
+          <summary>Set up Pro automation</summary>
+          <div class="field"><label>Sync URL <span class="muted">(Apps Script Web App)</span></label>
+            <input id="s_syncUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" /></div>
+          <div class="field"><label>Secret <span class="muted">(must match the script)</span></label>
+            <input id="s_syncToken" type="text" autocomplete="off" placeholder="a word only you know" /></div>
+          <p class="pin-help">Leave blank to keep everything on this device. Guide: <b>reminders/SETUP.md</b>.</p>
+        </details>
       </section>
 
       <section class="settings-card">

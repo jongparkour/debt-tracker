@@ -1015,6 +1015,18 @@ body.modal-open { overflow: hidden; }
   border-radius: 11px; font-size: 1.1rem;
 }
 .settings-card-title h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.pro-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+  background: var(--accent);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
 .settings-card-title p { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
 
 /* Segmented theme toggle */
