@@ -232,17 +232,20 @@ function receiptText(person, paymentAmount) {
   const amt = peso(paymentAmount);
   const settled = remaining <= 0;
 
+  const remainingLine = settled
+    ? "*** FULLY PAID ✓ — no remaining balance. ***"
+    : `*** REMAINING BALANCE TO PAY: ${peso(remaining)} ***`;
+
   const emailBody =
     `Hi ${person.name},\n\n` +
     `Payment received: ${amt} on ${fmtDate(now.toISOString())}.\n\n` +
+    `${remainingLine}\n\n` +
     `Summary\n` +
     `• Today: ${peso(today)}\n` +
     `• This week: ${peso(week)}\n` +
     `• This month: ${peso(month)}\n` +
-    `• Total paid: ${peso(paid)} of ${peso(total)}\n` +
-    `• Remaining balance: ${peso(remaining)}` +
-    (settled ? " — fully paid ✓" : "") +
-    `\n\nThank you!`;
+    `• Total paid: ${peso(paid)} of ${peso(total)}\n\n` +
+    `Thank you!`;
 
   const smsBody = settled
     ? `Hi ${person.name}, received ${amt}. FULLY PAID ✓ — no remaining balance. Thank you!`
@@ -1536,7 +1539,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.8.1";
+const APP_VERSION = "3.8.2";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
