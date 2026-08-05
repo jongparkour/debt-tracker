@@ -1078,6 +1078,20 @@ body.modal-open { overflow: hidden; }
 /* Feedback char counter */
 .char-count { text-align: right; font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
 
+/* Share: install QR code */
+.qr-box { margin-top: 16px; text-align: center; }
+.qr-img {
+  display: inline-block;
+  background: #fff;              /* white quiet-zone so it scans in dark theme too */
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  line-height: 0;
+}
+.qr-img img { display: block; width: 200px; height: 200px; image-rendering: pixelated; }
+.qr-cap { margin: 12px 0; font-size: 0.76rem; color: var(--muted); }
+.qr-actions { display: flex; gap: 8px; justify-content: center; }
+
 /* Danger / lock card */
 .danger-card {
   display: flex;

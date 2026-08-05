@@ -427,6 +427,23 @@
 
       <section class="settings-card">
         <div class="settings-card-head">
+          <div class="settings-card-icon">🔗</div>
+          <div class="settings-card-title"><h2>Share the app</h2>
+            <p>Let others scan a QR code to install it.</p></div>
+        </div>
+        <button type="button" class="btn primary" id="s_qrBtn" style="width:100%;">📱 Show install QR code</button>
+        <div id="s_qrWrap" class="qr-box hidden">
+          <div id="s_qrImg" class="qr-img"></div>
+          <p class="qr-cap">Scan with a phone camera to download the Android app.</p>
+          <div class="qr-actions">
+            <button type="button" class="btn small" id="s_qrCopy">Copy link</button>
+            <button type="button" class="btn small hidden" id="s_qrShare">Share…</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
           <div class="settings-card-icon">💬</div>
           <div class="settings-card-title"><h2>Feedback</h2>
             <p>Tell us what's working and what isn't.</p></div>
@@ -585,6 +602,52 @@
       refreshRec();
       setMsg("New code shown above — save it. The old one no longer works.", true);
     });
+
+    // ----- Share: QR code to install the APK (generated offline) -----
+    const APK_URL =
+      "https://github.com/jongparkour/debt-tracker/raw/main/debt-tracker.apk";
+    const qrBtn = $("s_qrBtn");
+    const qrWrap = $("s_qrWrap");
+    let qrBuilt = false;
+    qrBtn.addEventListener("click", () => {
+      const showing = !qrWrap.classList.contains("hidden");
+      if (showing) {
+        qrWrap.classList.add("hidden");
+        qrBtn.textContent = "📱 Show install QR code";
+        return;
+      }
+      if (!qrBuilt) {
+        try {
+          const qr = window.qrcode(0, "M");
+          qr.addData(APK_URL);
+          qr.make();
+          $("s_qrImg").innerHTML = qr.createImgTag(5, 16, "Install Debt Tracker");
+          qrBuilt = true;
+        } catch (e) {
+          $("s_qrImg").innerHTML =
+            '<p class="muted" style="padding:20px;">Couldn\'t generate the QR code.</p>';
+        }
+      }
+      qrWrap.classList.remove("hidden");
+      qrBtn.textContent = "Hide QR code";
+    });
+    $("s_qrCopy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(APK_URL);
+        if (window.toast) toast("Install link copied.");
+      } catch (e) {
+        setMsg("Couldn't copy — long-press the QR's link instead.");
+      }
+    });
+    const qrShare = $("s_qrShare");
+    if (navigator.share) {
+      show(qrShare);
+      qrShare.addEventListener("click", () => {
+        navigator
+          .share({ title: "Debt Tracker", text: "Install Debt Tracker:", url: APK_URL })
+          .catch(() => {});
+      });
+    }
 
     // ----- Feedback (opens the email app) -----
     const fb = $("s_feedback"),
