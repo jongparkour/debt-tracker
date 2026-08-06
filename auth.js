@@ -478,11 +478,7 @@
       </section>
 
       <section class="settings-card danger-card">
-        <div class="setting-row-text">
-          <span class="setting-row-label">Lock app now</span>
-          <span class="setting-row-cap">Immediately hide everything behind your PIN.</span>
-        </div>
-        <button type="button" class="btn danger-btn" id="s_lockBtn">🔒 Lock now</button>
+        <button type="button" class="btn danger-btn" id="s_lockBtn" style="width:100%;">🔒 Lock app now</button>
       </section>
 
       <p id="s_msg" class="settings-msg"></p>
