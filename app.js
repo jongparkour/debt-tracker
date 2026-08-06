@@ -398,6 +398,105 @@ async function syncDebtorById(repId, paymentAmount) {
   }
 }
 
+/* -------------------- Sign-up form auto-import -------------------- */
+/* Pulls new debtors from a published Google Sheet CSV (the form's responses).
+   Only ADDS names that don't already exist — never overwrites your edits. */
+
+function getSignupUrl() {
+  try {
+    return (localStorage.getItem("dt_signupUrl") || "").trim();
+  } catch (e) {
+    return "";
+  }
+}
+function setSignupUrl(u) {
+  try {
+    localStorage.setItem("dt_signupUrl", (u || "").trim());
+  } catch (e) {}
+}
+
+/** Fetch the form's CSV and add any new sign-ups. `silent` = quiet on-open pull. */
+async function pullSignups(silent) {
+  const url = getSignupUrl();
+  if (!url) {
+    if (!silent) toast("Add your form's published CSV link first.");
+    return;
+  }
+  let text;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    text = await res.text();
+  } catch (e) {
+    if (!silent) toast("Couldn't fetch the sheet — use ⬆ Import CSV instead.");
+    return;
+  }
+
+  let rows;
+  try {
+    rows = parseCSV(text).filter((r) => r.some((c) => String(c).trim() !== ""));
+  } catch (e) {
+    rows = [];
+  }
+  if (rows.length < 2) {
+    if (!silent) toast("No sign-ups found in that link.");
+    return;
+  }
+
+  const header = rows[0].map(normLabel);
+  const col = {};
+  header.forEach((h, i) => {
+    if (!(h in col)) col[h] = i;
+  });
+  const iName = col["debtor name"],
+    iDebt = col["total debt"];
+  if (iName == null || iDebt == null) {
+    if (!silent) toast("Sheet needs 'Debtor Name' and 'Total Debt' columns.");
+    return;
+  }
+  const iTarget = col["monthly target"],
+    iRule = col["payment rule"],
+    iDue = col["due date"],
+    iNote = col["note"],
+    iEmail = col["email"],
+    iPhone = col["phone"];
+
+  const existing = await DebtorsDB.getAll();
+  const have = new Set(existing.map((d) => normName(d.name)));
+
+  let added = 0;
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    const name = String(row[iName] || "").trim();
+    if (!name) continue;
+    const key = normName(name);
+    if (have.has(key)) continue; // already in the app — never overwrite
+    const totalDebt = parseNum(row[iDebt]);
+    if (!(totalDebt > 0)) continue;
+
+    await DebtorsDB.add({
+      name,
+      totalDebt,
+      monthlyTarget: iTarget != null ? parseNum(row[iTarget]) : 0,
+      paymentRule: iRule != null ? String(row[iRule] || "").trim() : "",
+      dueDate: iDue != null ? parseDateISO(row[iDue]) || "" : "",
+      note: iNote != null ? String(row[iNote] || "").trim() : "",
+      email: iEmail != null ? String(row[iEmail] || "").trim() : "",
+      phone: iPhone != null ? String(row[iPhone] || "").trim() : "",
+    });
+    have.add(key);
+    added++;
+  }
+
+  if (added > 0) {
+    if (currentDetailKey == null) loadDebtors();
+    else refreshCurrentView();
+    toast(`Imported ${added} new sign-up${added !== 1 ? "s" : ""}.`);
+  } else if (!silent) {
+    toast("No new sign-ups.");
+  }
+}
+
 /* -------------------- Name / month helpers -------------------- */
 
 /** Normalize a name for grouping (case-insensitive, trimmed, collapsed spaces). */
@@ -1594,7 +1693,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.9.4";
+const APP_VERSION = "3.10";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
@@ -1637,3 +1736,4 @@ updateOnlineStatus();
 updateApkPromo();
 loadDebtors(true);
 flushSyncQueue(); // resend any events queued while offline
+if (getSignupUrl()) pullSignups(true); // auto-import new form sign-ups on open
