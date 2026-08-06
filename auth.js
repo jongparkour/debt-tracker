@@ -442,6 +442,17 @@
         </div>
       </section>
 
+      <section class="settings-card hidden" id="s_codeCard">
+        <div class="settings-card-head">
+          <div class="settings-card-icon">📝</div>
+          <div class="settings-card-title"><h2>Sign-up code</h2>
+            <p>Only debtors who signed up under this code appear on this device.</p></div>
+        </div>
+        <div class="field"><label>Your code</label>
+          <input id="s_lenderCode" autocomplete="off" placeholder="e.g. JUAN123" /></div>
+        <button type="button" class="btn" id="s_lenderCodeSave" style="width:100%;">Save code</button>
+      </section>
+
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">📧</div>
@@ -580,6 +591,17 @@
       proDone();
       if (window.toast) toast("Thanks! Your request for full automation was recorded.");
     });
+
+    // ----- Sign-up code (only when the sign-up feed is configured in this build) -----
+    if (window.getSignupUrl && getSignupUrl()) {
+      $("s_codeCard").classList.remove("hidden");
+      $("s_lenderCode").value = window.getLenderCode ? getLenderCode() : "";
+      $("s_lenderCodeSave").addEventListener("click", () => {
+        if (window.setLenderCode) setLenderCode($("s_lenderCode").value);
+        if (window.toast) toast("Code saved. Fetching your sign-ups…");
+        if (window.pullSignups) pullSignups(false);
+      });
+    }
 
     // ----- Biometrics (applied immediately) -----
     const bioBtn = $("s_bioBtn"),

@@ -18,6 +18,7 @@ free **Google Form → Google Sheet → CSV import** (your app already has an **
    | **Due Date** | Date | optional |
    | **Note** | Paragraph | optional |
    | **Monthly Target** | Short answer | optional — expected payment per month |
+   | **Code** | Short answer | for routing to the right lender (auto-filled — see "codes" below) |
 
 3. **Responses** tab → **Link to Sheets** → *Create a new spreadsheet*. Every submission now
    lands in that Sheet automatically.
@@ -52,6 +53,19 @@ Notes:
 - It updates **when the app is opened** — not while it's closed.
 - Published CSV can lag a **few minutes** behind a fresh submission.
 - Every install pulls from this **one** sheet (it's baked into the app).
+
+## 🎯 Route sign-ups to the right lender (codes)
+Your one sheet can serve many lenders — each device only shows **its own** debtors:
+1. Keep the **Code** question in the form (short answer).
+2. For each lender, make a **pre-filled link** so their borrowers are auto-tagged:
+   Form → **⋮ (top-right) → Get pre-filled link** → type that lender's code (e.g. `JUAN123`)
+   in the **Code** field → **Get link** → copy. Share *that* link with that lender's borrowers.
+   (The borrower never types the code — it's already filled in.)
+3. On each lender's phone, the app asks for their **code once** (or set it in
+   **⚙️ Settings → Sign-up code**). That device then imports **only** rows whose Code matches.
+
+Flow: borrower opens the lender's pre-filled link → fills their info → it lands in your one
+sheet tagged with that lender's code → appears **only** on that lender's device.
 
 ## Good to know
 - The Sheet has an extra **Timestamp** column — the app ignores it.

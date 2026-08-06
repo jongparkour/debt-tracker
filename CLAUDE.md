@@ -61,13 +61,17 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - No free SMS (carriers charge the sender).
 
 ## Sign-up auto-import (debtors self-register)
-Debtors fill a Google Form → its response Sheet is **Published to web as CSV** → the app
-auto-imports new debtors. **Backend-configured, no app UI:** set the CSV link in the
-`SIGNUP_CSV_URL` constant at the top of `app.js`. On every open, `pullSignups(true)` fetches
-it and adds only **new** names (never overwrites; de-duped by `normName`). Falls back to
-manual **Import CSV** if the fetch fails. CSV import requires only Name + Total Debt (payment
-columns optional). Guide: `signup-form.md`. Caveat: one shared sheet baked into all installs;
-updates only on app open (no closed-app push without the Pro backend).
+Debtors fill a Google Form → response Sheet **Published to web as CSV** → the app
+auto-imports on open. **Backend-configured feed, per-device filtering:**
+- Set the CSV link in the `SIGNUP_CSV_URL` constant at the top of `app.js` (no app UI for the URL).
+- The sheet has a **Code** column. Each device stores its own **lender code** (`dt_lenderCode`,
+  set via a one-time prompt `maybePromptLenderCode()` after unlock, or **Settings → Sign-up code**
+  which only appears when `SIGNUP_CSV_URL` is set). `pullSignups()` imports **only rows whose Code
+  matches** this device's code — so one shared sheet serves many lenders, each seeing only theirs.
+- Lenders share a Google Form **pre-filled link** carrying their code so rows get tagged.
+- Adds only **new** names (de-duped by `normName`, never overwrites). Falls back to manual
+  **Import CSV** on fetch failure. Import needs only Name + Total Debt. Guide: `signup-form.md`.
+- Updates on app open only (no closed-app push without the Pro backend).
 
 ## Data & safety
 - All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.

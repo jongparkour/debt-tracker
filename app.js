@@ -414,6 +414,20 @@ function getSignupUrl() {
   return (typeof SIGNUP_CSV_URL === "string" ? SIGNUP_CSV_URL : "").trim();
 }
 
+/** This device's lender code — only sign-up rows tagged with it are imported here. */
+function getLenderCode() {
+  try {
+    return (localStorage.getItem("dt_lenderCode") || "").trim();
+  } catch (e) {
+    return "";
+  }
+}
+function setLenderCode(c) {
+  try {
+    localStorage.setItem("dt_lenderCode", (c || "").trim());
+  } catch (e) {}
+}
+
 /** Fetch the form's CSV and add any new sign-ups. `silent` = quiet on-open pull. */
 async function pullSignups(silent) {
   const url = getSignupUrl();
@@ -458,7 +472,15 @@ async function pullSignups(silent) {
     iDue = col["due date"],
     iNote = col["note"],
     iEmail = col["email"],
-    iPhone = col["phone"];
+    iPhone = col["phone"],
+    iCode = col["code"] != null ? col["code"] : col["lender"];
+
+  // Only import rows tagged with THIS device's lender code.
+  const myCode = getLenderCode().toLowerCase();
+  if (!myCode) {
+    if (!silent) toast("Set your sign-up code first (Settings).");
+    return;
+  }
 
   const existing = await DebtorsDB.getAll();
   const have = new Set(existing.map((d) => normName(d.name)));
@@ -466,6 +488,8 @@ async function pullSignups(silent) {
   let added = 0;
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
+    const rowCode = iCode != null ? String(row[iCode] || "").trim().toLowerCase() : "";
+    if (rowCode !== myCode) continue; // not for this device
     const name = String(row[iName] || "").trim();
     if (!name) continue;
     const key = normName(name);
@@ -494,6 +518,31 @@ async function pullSignups(silent) {
   } else if (!silent) {
     toast("No new sign-ups.");
   }
+}
+
+let lenderCodePrompted = false;
+/** One-time prompt for this device's sign-up code (only when sign-ups are configured). */
+function maybePromptLenderCode() {
+  if (lenderCodePrompted) return;
+  if (!getSignupUrl() || getLenderCode()) return; // not configured, or already set
+  lenderCodePrompted = true;
+  openModal(
+    "Your sign-up code",
+    `
+    <p class="muted modal-intro">Enter your lender code so this device only shows the debtors who signed up under you.</p>
+    <div class="field"><label>Sign-up code</label>
+      <input id="lc_code" autocomplete="off" placeholder="e.g. JUAN123" /></div>
+  `,
+    async () => {
+      const code = $("lc_code").value.trim();
+      if (!code) return toast("Enter your code, or tap Cancel.");
+      setLenderCode(code);
+      closeModal();
+      toast("Saved. Fetching your sign-ups…");
+      pullSignups(false);
+    }
+  );
+  setTimeout(() => $("lc_code") && $("lc_code").focus(), 60);
 }
 
 /* -------------------- Name / month helpers -------------------- */
@@ -1203,6 +1252,7 @@ function showList() {
   currentDetailKey = null;
   showView("listView");
   loadDebtors(true);
+  maybePromptLenderCode(); // ask once for this device's sign-up code (post-unlock)
 }
 
 async function refreshCurrentView() {
@@ -1692,7 +1742,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.11";
+const APP_VERSION = "3.12";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
