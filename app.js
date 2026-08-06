@@ -3,6 +3,12 @@
    Depends on db.js (DebtorsDB, PaymentsDB)
    ============================================================ */
 
+/* -------------------- Config (set in code, not in the app UI) -------------------- */
+/* Debtor sign-up auto-import: paste your Google Form's PUBLISHED CSV link here.
+   When set, the app silently pulls new sign-ups on every open. Leave "" to disable.
+   Example: https://docs.google.com/spreadsheets/d/e/XXXX/pub?output=csv        */
+const SIGNUP_CSV_URL = "";
+
 /* -------------------- Helpers -------------------- */
 
 /** Format a number as Philippine Peso, e.g. 1234.5 -> ₱1,234.50 */
@@ -402,17 +408,10 @@ async function syncDebtorById(repId, paymentAmount) {
 /* Pulls new debtors from a published Google Sheet CSV (the form's responses).
    Only ADDS names that don't already exist — never overwrites your edits. */
 
+/** The sign-up CSV link comes from the SIGNUP_CSV_URL config at the top of this file
+ *  (backend-set, not shown in the app). */
 function getSignupUrl() {
-  try {
-    return (localStorage.getItem("dt_signupUrl") || "").trim();
-  } catch (e) {
-    return "";
-  }
-}
-function setSignupUrl(u) {
-  try {
-    localStorage.setItem("dt_signupUrl", (u || "").trim());
-  } catch (e) {}
+  return (typeof SIGNUP_CSV_URL === "string" ? SIGNUP_CSV_URL : "").trim();
 }
 
 /** Fetch the form's CSV and add any new sign-ups. `silent` = quiet on-open pull. */
@@ -1693,7 +1692,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.10";
+const APP_VERSION = "3.11";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

@@ -60,6 +60,15 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - The app's sync plumbing is **dormant** in `app.js` (`getSyncConfig`/`postSync`/`syncDebtorById`, offline queue `dt_syncQueue`) — it no-ops because no URL is set. To turn Pro on, re-add a URL source (central endpoint) and the Settings fields, then deploy `AutoReminders.gs`.
 - No free SMS (carriers charge the sender).
 
+## Sign-up auto-import (debtors self-register)
+Debtors fill a Google Form → its response Sheet is **Published to web as CSV** → the app
+auto-imports new debtors. **Backend-configured, no app UI:** set the CSV link in the
+`SIGNUP_CSV_URL` constant at the top of `app.js`. On every open, `pullSignups(true)` fetches
+it and adds only **new** names (never overwrites; de-duped by `normName`). Falls back to
+manual **Import CSV** if the fetch fails. CSV import requires only Name + Total Debt (payment
+columns optional). Guide: `signup-form.md`. Caveat: one shared sheet baked into all installs;
+updates only on app open (no closed-app push without the Pro backend).
+
 ## Data & safety
 - All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.
 - CSV export/import is the backup path (headers include Due Date + Note as of v3.2).

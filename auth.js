@@ -444,22 +444,6 @@
 
       <section class="settings-card">
         <div class="settings-card-head">
-          <div class="settings-card-icon">📝</div>
-          <div class="settings-card-title"><h2>Sign-up form auto-import</h2>
-            <p>Let debtors add themselves via a Google Form. Paste your form's
-               <b>published CSV link</b> — new sign-ups import automatically each time you open the app.</p></div>
-        </div>
-        <div class="field"><label>Published CSV link</label>
-          <input id="s_signupUrl" type="url" autocomplete="off" placeholder="https://docs.google.com/…/pub?output=csv" /></div>
-        <div class="choice-actions">
-          <button type="button" class="btn" id="s_signupSave">Save link</button>
-          <button type="button" class="btn primary" id="s_signupPull">Pull sign-ups now</button>
-        </div>
-        <p class="pin-help">Setup: <b>signup-form.md</b>. Falls back to <b>⬆ Import CSV</b> if Google blocks the fetch.</p>
-      </section>
-
-      <section class="settings-card">
-        <div class="settings-card-head">
           <div class="settings-card-icon">📧</div>
           <div class="settings-card-title"><h2>Auto reminders <span class="pro-badge">PRO</span></h2>
             <p>Free: tap <b>✉️</b> / <b>💬</b> on any debtor to send a reminder in one tap.
@@ -595,18 +579,6 @@
       try { localStorage.setItem("dt_proRequested", "1"); } catch (e) {}
       proDone();
       if (window.toast) toast("Thanks! Your request for full automation was recorded.");
-    });
-
-    // ----- Sign-up form auto-import -----
-    const signupUrl = $("s_signupUrl");
-    if (window.getSignupUrl) signupUrl.value = getSignupUrl();
-    $("s_signupSave").addEventListener("click", () => {
-      if (window.setSignupUrl) setSignupUrl(signupUrl.value);
-      if (window.toast) toast("Sign-up link saved.");
-    });
-    $("s_signupPull").addEventListener("click", () => {
-      if (window.setSignupUrl) setSignupUrl(signupUrl.value); // save what's typed, then pull
-      if (window.pullSignups) pullSignups(false);
     });
 
     // ----- Biometrics (applied immediately) -----

@@ -35,20 +35,23 @@ When you want to add the new people:
 
 That's it — their amount, email, phone, due date, and note all come in.
 
-## ⚡ Make it automatic (import on app open — no download)
-Instead of downloading a CSV each time, let the app pull sign-ups itself:
+## ⚡ Fully automatic (configured in code — nothing shown in the app)
+The app auto-imports sign-ups from a link you set **in the code**, so there's no setting to
+touch and users see nothing.
 1. Open the linked response **Google Sheet** → **File → Share → Publish to web**.
-2. Under "Link", choose the **response sheet** and format **Comma-separated values (.csv)** →
-   **Publish**. Copy the link (looks like `https://docs.google.com/…/pub?output=csv`).
-3. In the app: **⚙️ Settings → Sign-up form auto-import** → paste the link → **Save link**.
-4. Done. From now on, **every time you open the app** it fetches new sign-ups and adds them
-   automatically (de-duped by name). You can also tap **Pull sign-ups now** any time.
+2. Choose the **response sheet**, format **Comma-separated values (.csv)** → **Publish**.
+   Copy the link (looks like `https://docs.google.com/…/pub?output=csv`).
+3. Paste it into **`app.js`** → the `SIGNUP_CSV_URL` constant near the top:
+   ```js
+   const SIGNUP_CSV_URL = "https://docs.google.com/…/pub?output=csv";
+   ```
+4. Rebuild + deploy (`build-zip.ps1` → Netlify). Done — **every time the app opens** it
+   silently fetches new sign-ups and adds them (de-duped by name). No UI, no taps.
 
-Notes on the automatic mode:
-- It updates **when you open the app** (or tap Pull) — not while the app is closed.
-- Google's published CSV can lag a **few minutes** behind a brand-new submission.
-- If Google ever blocks the fetch, the app tells you — just use the manual **Import CSV**
-  step above instead.
+Notes:
+- It updates **when the app is opened** — not while it's closed.
+- Published CSV can lag a **few minutes** behind a fresh submission.
+- Every install pulls from this **one** sheet (it's baked into the app).
 
 ## Good to know
 - The Sheet has an extra **Timestamp** column — the app ignores it.
