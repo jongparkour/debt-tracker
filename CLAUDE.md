@@ -64,10 +64,11 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 Debtors fill a Google Form → response Sheet **Published to web as CSV** → the app
 auto-imports on open. **Backend-configured feed, per-device filtering:**
 - Set the CSV link in the `SIGNUP_CSV_URL` constant at the top of `app.js` (no app UI for the URL).
-- The sheet has a **Code** column. Each device stores its own **lender code** (`dt_lenderCode`,
-  set via a one-time prompt `maybePromptLenderCode()` after unlock, or **Settings → Sign-up code**
-  which only appears when `SIGNUP_CSV_URL` is set). `pullSignups()` imports **only rows whose Code
-  matches** this device's code — so one shared sheet serves many lenders, each seeing only theirs.
+- The sheet may have a **Code** column. Each device stores its own **lender code** (`dt_lenderCode`),
+  set only in **Settings → Sign-up code** (that card appears only when `SIGNUP_CSV_URL` is set; no prompt).
+  If the sheet HAS a Code column, `pullSignups()` imports **only rows whose Code matches** this device's
+  code (many lenders, each seeing theirs). If there's **no Code column** (or code left blank) it's
+  single-lender mode → imports everyone. "Phone number" is accepted as an alias for "Phone".
 - Lenders share a Google Form **pre-filled link** carrying their code so rows get tagged.
 - Adds only **new** names (de-duped by `normName`, never overwrites). Falls back to manual
   **Import CSV** on fetch failure. Import needs only Name + Total Debt. Guide: `signup-form.md`.

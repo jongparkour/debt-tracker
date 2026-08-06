@@ -446,7 +446,8 @@
         <div class="settings-card-head">
           <div class="settings-card-icon">📝</div>
           <div class="settings-card-title"><h2>Sign-up code</h2>
-            <p>Only debtors who signed up under this code appear on this device.</p></div>
+            <p>Only debtors who signed up under this code appear on this device.
+               <b>Leave blank if you're the only lender.</b></p></div>
         </div>
         <div class="field"><label>Your code</label>
           <input id="s_lenderCode" autocomplete="off" placeholder="e.g. JUAN123" /></div>

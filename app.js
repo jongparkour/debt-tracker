@@ -524,40 +524,6 @@ async function pullSignups(silent) {
   }
 }
 
-let lenderCodePrompted = false;
-function signupCodeAsked() {
-  try {
-    return localStorage.getItem("dt_signupCodeAsked") === "1";
-  } catch (e) {
-    return false;
-  }
-}
-/** One-time prompt for this device's sign-up code (only when sign-ups are configured). */
-function maybePromptLenderCode() {
-  if (lenderCodePrompted) return;
-  if (!getSignupUrl()) return; // sign-ups not configured in this build
-  if (getLenderCode() || signupCodeAsked()) return; // already set or already answered
-  lenderCodePrompted = true;
-  openModal(
-    "Your sign-up code",
-    `
-    <p class="muted modal-intro">If several lenders share this app, enter your code so this device
-      only shows the debtors who signed up under you. <b>Leave blank if you're the only lender.</b></p>
-    <div class="field"><label>Sign-up code</label>
-      <input id="lc_code" autocomplete="off" placeholder="e.g. JUAN123 (or leave blank)" /></div>
-  `,
-    async () => {
-      const code = $("lc_code").value.trim();
-      setLenderCode(code);
-      try { localStorage.setItem("dt_signupCodeAsked", "1"); } catch (e) {}
-      closeModal();
-      toast(code ? "Saved. Fetching your sign-ups…" : "Fetching sign-ups…");
-      pullSignups(false);
-    }
-  );
-  setTimeout(() => $("lc_code") && $("lc_code").focus(), 60);
-}
-
 /* -------------------- Name / month helpers -------------------- */
 
 /** Normalize a name for grouping (case-insensitive, trimmed, collapsed spaces). */
@@ -1265,7 +1231,6 @@ function showList() {
   currentDetailKey = null;
   showView("listView");
   loadDebtors(true);
-  maybePromptLenderCode(); // ask once for this device's sign-up code (post-unlock)
 }
 
 async function refreshCurrentView() {
@@ -1755,7 +1720,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.13";
+const APP_VERSION = "3.13.1";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
