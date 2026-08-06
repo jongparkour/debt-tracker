@@ -442,16 +442,13 @@
         </div>
       </section>
 
-      <section class="settings-card hidden" id="s_codeCard">
+      <section class="settings-card hidden" id="s_shareFormCard">
         <div class="settings-card-head">
           <div class="settings-card-icon">📝</div>
-          <div class="settings-card-title"><h2>Sign-up code</h2>
-            <p>Only debtors who signed up under this code appear on this device.
-               <b>Leave blank if you're the only lender.</b></p></div>
+          <div class="settings-card-title"><h2>Debtor sign-up link</h2>
+            <p>Share this so people can add themselves — their details land in your app automatically.</p></div>
         </div>
-        <div class="field"><label>Your code</label>
-          <input id="s_lenderCode" autocomplete="off" placeholder="e.g. JUAN123" /></div>
-        <button type="button" class="btn" id="s_lenderCodeSave" style="width:100%;">Save code</button>
+        <div id="s_shareFormBody"></div>
       </section>
 
       <section class="settings-card">
@@ -593,15 +590,47 @@
       if (window.toast) toast("Thanks! Your request for full automation was recorded.");
     });
 
-    // ----- Sign-up code (only when the sign-up feed is configured in this build) -----
+    // ----- Debtor sign-up link (only when the feed is configured) -----
     if (window.getSignupUrl && getSignupUrl()) {
-      $("s_codeCard").classList.remove("hidden");
-      $("s_lenderCode").value = window.getLenderCode ? getLenderCode() : "";
-      $("s_lenderCodeSave").addEventListener("click", () => {
-        if (window.setLenderCode) setLenderCode($("s_lenderCode").value);
-        if (window.toast) toast("Code saved. Fetching your sign-ups…");
-        if (window.pullSignups) pullSignups(false);
-      });
+      $("s_shareFormCard").classList.remove("hidden");
+      const link = window.signupShareLink ? signupShareLink() : "";
+      const body = $("s_shareFormBody");
+      if (!link) {
+        body.innerHTML =
+          '<p class="pin-help">Almost there — add your Google Form link in the app config ' +
+          "(<b>SIGNUP_FORM_URL</b> in app.js). See <b>signup-form.md</b>.</p>";
+      } else {
+        body.innerHTML =
+          '<div class="qr-box"><div class="qr-img" id="s_formQr"></div>' +
+          '<p class="qr-cap">Share this link (or QR) with your debtors.</p>' +
+          '<div class="qr-actions">' +
+          '<button type="button" class="btn small" id="s_formCopy">Copy link</button>' +
+          '<button type="button" class="btn small hidden" id="s_formShare">Share…</button>' +
+          "</div></div>";
+        try {
+          const qr = window.qrcode(0, "M");
+          qr.addData(link);
+          qr.make();
+          $("s_formQr").innerHTML = qr.createImgTag(5, 16, "Sign-up form");
+        } catch (e) {}
+        $("s_formCopy").addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(link);
+            if (window.toast) toast("Link copied.");
+          } catch (e) {
+            setMsg("Couldn't copy — long-press the link.");
+          }
+        });
+        const fShare = $("s_formShare");
+        if (navigator.share) {
+          show(fShare);
+          fShare.addEventListener("click", () =>
+            navigator
+              .share({ title: "Sign up", text: "Add yourself as a debtor:", url: link })
+              .catch(() => {})
+          );
+        }
+      }
     }
 
     // ----- Biometrics (applied immediately) -----

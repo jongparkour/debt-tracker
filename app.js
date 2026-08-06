@@ -10,6 +10,13 @@
 const SIGNUP_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9C-8OsHbzzUyZgHhNVNeiPB4ocd4KjneeJisU16ntos4JTjm2DftMSsZRlDiAtqLf4953AKZfNtt7/pub?gid=2050044964&single=true&output=csv";
 
+/* The Google Form debtors fill in. SIGNUP_FORM_URL = the plain public link (Form → Send → link).
+   SIGNUP_FORM_PREFILL = OPTIONAL, for multi-lender routing: the form's pre-filled link up to and
+   including the Code field, e.g. ".../viewform?usp=pp_url&entry.123456789=" — the app appends this
+   device's auto-generated tag so each lender's sign-ups route back to their own device. */
+const SIGNUP_FORM_URL = "";
+const SIGNUP_FORM_PREFILL = "";
+
 /* -------------------- Helpers -------------------- */
 
 /** Format a number as Philippine Peso, e.g. 1234.5 -> ₱1,234.50 */
@@ -415,7 +422,7 @@ function getSignupUrl() {
   return (typeof SIGNUP_CSV_URL === "string" ? SIGNUP_CSV_URL : "").trim();
 }
 
-/** This device's lender code — only sign-up rows tagged with it are imported here. */
+/** This device's auto-generated tag — only sign-up rows carrying it import here. */
 function getLenderCode() {
   try {
     return (localStorage.getItem("dt_lenderCode") || "").trim();
@@ -427,6 +434,17 @@ function setLenderCode(c) {
   try {
     localStorage.setItem("dt_lenderCode", (c || "").trim());
   } catch (e) {}
+}
+/** Auto-generate this device's tag once (used only for multi-lender routing). */
+function ensureLenderCode() {
+  if (!getLenderCode()) setLenderCode("d" + Math.random().toString(36).slice(2, 8));
+  return getLenderCode();
+}
+/** The link to give debtors: personalized (with this device's tag) if a pre-fill base is
+ *  configured, otherwise the plain form link. */
+function signupShareLink() {
+  if (SIGNUP_FORM_PREFILL) return SIGNUP_FORM_PREFILL + encodeURIComponent(ensureLenderCode());
+  return SIGNUP_FORM_URL || "";
 }
 
 /** Fetch the form's CSV and add any new sign-ups. `silent` = quiet on-open pull. */
@@ -1720,7 +1738,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.13.1";
+const APP_VERSION = "3.14";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
@@ -1763,4 +1781,7 @@ updateOnlineStatus();
 updateApkPromo();
 loadDebtors(true);
 flushSyncQueue(); // resend any events queued while offline
-if (getSignupUrl()) pullSignups(true); // auto-import new form sign-ups on open
+if (getSignupUrl()) {
+  if (SIGNUP_FORM_PREFILL) ensureLenderCode(); // routed multi-lender mode → this device needs a tag
+  pullSignups(true); // auto-import new form sign-ups on open
+}
