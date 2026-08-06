@@ -1361,7 +1361,9 @@ async function importDataCSV(file) {
   header.forEach((h, i) => {
     if (!(h in col)) col[h] = i;
   });
-  const required = ["debtor name", "total debt", "payment date", "payment amount"];
+  // Only name + amount are required — a debtor-only CSV (e.g. a sign-up form
+  // export, no payments yet) imports fine; payment columns are optional.
+  const required = ["debtor name", "total debt"];
   const missing = required
     .filter((r) => !(r in col))
     .map((r) => DATA_HEADERS.find((h) => normLabel(h) === r) || r);
@@ -1592,7 +1594,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.9.3";
+const APP_VERSION = "3.9.4";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
