@@ -14,8 +14,9 @@ const SIGNUP_CSV_URL =
    SIGNUP_FORM_PREFILL = OPTIONAL, for multi-lender routing: the form's pre-filled link up to and
    including the Code field, e.g. ".../viewform?usp=pp_url&entry.123456789=" — the app appends this
    device's auto-generated tag so each lender's sign-ups route back to their own device. */
-const SIGNUP_FORM_URL = "";
-const SIGNUP_FORM_PREFILL = "";
+const SIGNUP_FORM_URL = "https://forms.gle/ZJgtq5qgWeik96NK8";
+const SIGNUP_FORM_PREFILL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSf3IKrM3HoNu53sy-31qttfOR1PVsqcJ4tye8DIomnof73B6Q/viewform?usp=pp_url&entry.2093344895=";
 
 /* -------------------- Helpers -------------------- */
 
@@ -1738,7 +1739,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.14";
+const APP_VERSION = "3.15";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
