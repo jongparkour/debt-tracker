@@ -21,8 +21,11 @@ var REMIND_DAYS_BEFORE = [7, 3, 1];  // remind this many days before due
 var REMIND_WHEN_OVERDUE = true;      // keep reminding while overdue
 var RUN_HOURS = [8, 14];             // daily run times (morning + afternoon)
 
-// SMS via SMSGate (sms-gate.app) in CLOUD mode — install the app on your phone, switch it to
-// "Cloud Server", and paste the username/password it shows here. Blank = email only.
+// SMS gateway — your phone sends via its SIM. Fill ONE of the two (blank both = email only).
+//  A) textbee.dev  — install the "textbee" app (Play Store), register the device → API key + Device ID.
+var TEXTBEE_API_KEY = "";
+var TEXTBEE_DEVICE_ID = "";
+//  B) SMSGate (sms-gate.app) — install, switch to "Cloud Server" → username + password.
 var SMSGATE_USER = "";
 var SMSGATE_PASS = "";
 // =================================================
@@ -107,7 +110,7 @@ function sendReminders() {
         done.push("email");
       } catch (e) { done.push("email-ERR"); }
     }
-    if (phone && SMSGATE_USER && SMSGATE_PASS) {
+    if (phone && smsConfigured_()) {
       try {
         sendSms_(phone, "Hi " + name + ", " + lead + " Thank you! - " + SENDER_NAME);
         done.push("sms");
@@ -121,16 +124,28 @@ function sendReminders() {
   Logger.log("Reminders processed (" + slot + "): " + sentCount);
 }
 
-/** Send one SMS through SMSGate cloud (your phone → your SIM). */
+function smsConfigured_() {
+  return (TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID) || (SMSGATE_USER && SMSGATE_PASS);
+}
+/** Send one SMS through whichever gateway is configured (your phone → your SIM). */
 function sendSms_(phone, text) {
-  var res = UrlFetchApp.fetch("https://api.sms-gate.app/3rdparty/v1/message", {
-    method: "post",
-    contentType: "application/json",
-    headers: { Authorization: "Basic " + Utilities.base64Encode(SMSGATE_USER + ":" + SMSGATE_PASS) },
-    payload: JSON.stringify({ message: text, phoneNumbers: [phone] }),
-    muteHttpExceptions: true,
-  });
-  var code = res.getResponseCode();
+  var res, code;
+  if (TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID) {
+    res = UrlFetchApp.fetch("https://api.textbee.dev/api/v1/gateway/devices/" + TEXTBEE_DEVICE_ID + "/send-sms", {
+      method: "post", contentType: "application/json",
+      headers: { "x-api-key": TEXTBEE_API_KEY },
+      payload: JSON.stringify({ recipients: [phone], message: text }), muteHttpExceptions: true,
+    });
+  } else if (SMSGATE_USER && SMSGATE_PASS) {
+    res = UrlFetchApp.fetch("https://api.sms-gate.app/3rdparty/v1/message", {
+      method: "post", contentType: "application/json",
+      headers: { Authorization: "Basic " + Utilities.base64Encode(SMSGATE_USER + ":" + SMSGATE_PASS) },
+      payload: JSON.stringify({ message: text, phoneNumbers: [phone] }), muteHttpExceptions: true,
+    });
+  } else {
+    throw new Error("No SMS gateway configured");
+  }
+  code = res.getResponseCode();
   if (code >= 300) throw new Error("HTTP " + code + " " + res.getContentText().slice(0, 120));
 }
 
@@ -151,7 +166,7 @@ function sendTest() {
   var me = Session.getActiveUser().getEmail();
   MailApp.sendEmail({ to: me, name: SENDER_NAME, subject: "Debt Tracker — test",
     htmlBody: htmlEmail_("Test", '<p>If you got this, email works. ✓</p>'), body: "Email works." });
-  if (SMSGATE_USER && SMSGATE_PASS && TEST_PHONE) sendSms_(TEST_PHONE, "Debt Tracker test SMS ✓");
+  if (smsConfigured_() && TEST_PHONE) sendSms_(TEST_PHONE, "Debt Tracker test SMS ✓");
   Logger.log("Test sent.");
 }
 
