@@ -56,7 +56,12 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 
 **Pro (built but NOT wired yet — waiting for demand):**
 - Settings → Auto reminders shows an **"⚡ Upgrade to Pro"** button (no setup fields). Tapping it opens `pro-request.html` (a Cloudflare-beacon page) → **pageviews of `/pro-request.html` = number of Pro requests**. A local `dt_proRequested` flag stops repeat taps. **When it reaches ~10, build the central automation.**
-- The full automation code is ready: `reminders/AutoReminders.gs` (Apps Script **Web App**: `doPost` upsert + payment-confirmation email + AM/PM reminder triggers, branded HTML emails) + `reminders/SETUP.md`.
+- Automation code: `reminders/AutoReminders.gs` — a **sheet-based** Apps Script that reads the
+  Google Form response sheet and sends **Gmail + optional SMS** reminders (before/on/after due
+  date, AM/PM triggers, branded HTML email). **SMS** goes through a phone gateway (**textbee.dev**
+  by default — config `TEXTBEE_API_KEY`/`TEXTBEE_DEVICE_ID`; blank = email only) so texts send
+  from the user's own SIM. Reminders use the sheet's **Total Debt** (sign-up amount), not live
+  in-app remaining balance. Guide: `reminders/SETUP.md`.
 - The app's sync plumbing is **dormant** in `app.js` (`getSyncConfig`/`postSync`/`syncDebtorById`, offline queue `dt_syncQueue`) — it no-ops because no URL is set. To turn Pro on, re-add a URL source (central endpoint) and the Settings fields, then deploy `AutoReminders.gs`.
 - No free SMS (carriers charge the sender).
 
