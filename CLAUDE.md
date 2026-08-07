@@ -62,8 +62,20 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
   by default — config `TEXTBEE_API_KEY`/`TEXTBEE_DEVICE_ID`; blank = email only) so texts send
   from the user's own SIM. Reminders use the sheet's **Total Debt** (sign-up amount), not live
   in-app remaining balance. Guide: `reminders/SETUP.md`.
-- The app's sync plumbing is **dormant** in `app.js` (`getSyncConfig`/`postSync`/`syncDebtorById`, offline queue `dt_syncQueue`) — it no-ops because no URL is set. To turn Pro on, re-add a URL source (central endpoint) and the Settings fields, then deploy `AutoReminders.gs`.
 - No free SMS (carriers charge the sender).
+
+**Instant payment-confirmation email (wired, live-ready):**
+- Recording a payment calls `syncDebtorById(debtorId, amt)` → `postSync("payment_added", …)`
+  → POSTs `{name,email,total,paid,remaining,amount,dueDate}` (no-cors) to `PAYMENT_SYNC_URL`.
+  Offline attempts queue in `dt_syncQueue` and flush on next boot (`flushSyncQueue`).
+- Config constants at top of `app.js`: `PAYMENT_SYNC_URL` (blank = off → in-app tap-to-send
+  receipt used instead) + `PAYMENT_SYNC_SECRET` (currently `dt-pay-9oytk60`). `getSyncConfig()`
+  returns these constants (no Settings UI, no localStorage).
+- Endpoint = `reminders/AutoReminders.gs` `doPost` → `sendPaymentConfirm_` (checks `SECRET`
+  matches, then `MailApp.sendEmail` a branded receipt with the remaining balance). Deploy the
+  script as a **Web app** (Execute as Me, Anyone), paste the `/exec` URL into `PAYMENT_SYNC_URL`,
+  rebuild + redeploy. `debtor_upsert` POSTs were removed (debtor data flows via the form/sheet);
+  only `payment_added` fires now. Guide: `reminders/SETUP.md` §5.
 
 ## Sign-up auto-import (debtors self-register)
 Debtors fill a Google Form → response Sheet **Published to web as CSV** → the app

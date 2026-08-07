@@ -12,6 +12,11 @@
  * payments made inside the app. See SETUP.md.
  *
  * Setup: paste into Extensions → Apps Script, fill config, run createTriggers() once.
+ *
+ * BONUS — instant payment receipts: this file also exposes a Web App (doPost). Deploy it
+ * (Deploy → New deployment → Web app → Execute as Me, Anyone) and paste the /exec URL into
+ * the app's PAYMENT_SYNC_URL. Then every payment recorded in the app emails the debtor a
+ * "Payment received — remaining balance ₱X" receipt automatically. See bottom of file.
  */
 
 // ===================== CONFIG =====================
@@ -28,6 +33,9 @@ var TEXTBEE_DEVICE_ID = "";
 //  B) SMSGate (sms-gate.app) — install, switch to "Cloud Server" → username + password.
 var SMSGATE_USER = "";
 var SMSGATE_PASS = "";
+
+// Payment-confirmation Web App: MUST match PAYMENT_SYNC_SECRET in the app (app.js).
+var SECRET = "dt-pay-9oytk60";
 // =================================================
 
 /** Daily job (set two triggers via createTriggers). Emails + texts whoever is due. */
@@ -168,6 +176,49 @@ function sendTest() {
     htmlBody: htmlEmail_("Test", '<p>If you got this, email works. ✓</p>'), body: "Email works." });
   if (smsConfigured_() && TEST_PHONE) sendSms_(TEST_PHONE, "Debt Tracker test SMS ✓");
   Logger.log("Test sent.");
+}
+
+/* ============ Payment confirmations (Web App) ============
+ * Deploy: Apps Script → Deploy → New deployment → type "Web app" →
+ *   Execute as: Me   |   Who has access: Anyone → Deploy → copy the /exec URL.
+ * Paste that URL into the app's PAYMENT_SYNC_URL. The app POSTs each recorded
+ * payment here and this emails the debtor an instant receipt. */
+function doGet() {
+  return ContentService.createTextOutput("Debt Tracker payment endpoint is live.");
+}
+function doPost(e) {
+  try {
+    var body = JSON.parse(e.postData.contents);
+    if (String(body.token || "") !== SECRET) return ContentService.createTextOutput("bad token");
+    if (body.type !== "payment_added") return ContentService.createTextOutput("ignored");
+    sendPaymentConfirm_(body.data || {});
+    return ContentService.createTextOutput("ok");
+  } catch (err) {
+    return ContentService.createTextOutput("error: " + err.message);
+  }
+}
+function sendPaymentConfirm_(d) {
+  var email = String(d.email || "").trim();
+  if (!email) return;
+  var name = String(d.name || "there").trim();
+  var amt = peso_(d.amount);
+  var remaining = num_(d.remaining);
+  var settled = remaining <= 0;
+  var subject = settled ? "Payment received — fully paid ✓" : "Payment received — " + amt;
+  var lead = "We've recorded your payment of " + amt + ".";
+  var box = settled
+    ? balBox_("FULLY PAID ✓ — thank you!", true)
+    : balBox_("REMAINING BALANCE: " + peso_(remaining), false);
+  var inner = '<p style="margin:0 0 10px;">Hi ' + escapeHtml_(name) + ',</p>' +
+    '<p style="margin:0 0 4px;">' + escapeHtml_(lead) + '</p>' + box +
+    '<p style="margin:10px 0 0;">Thank you!</p>';
+  var plain = "Hi " + name + ",\n\n" + lead + "\n\n" +
+    (settled ? "Fully paid — thank you!" : "Remaining balance: " + peso_(remaining)) +
+    "\n\nThank you!";
+  MailApp.sendEmail({
+    to: email, subject: subject, name: SENDER_NAME,
+    htmlBody: htmlEmail_("Payment receipt", inner), body: plain,
+  });
 }
 
 /* ---------------- helpers ---------------- */

@@ -45,6 +45,21 @@ Apps Script can't send SMS itself, so your **phone** sends it (on your SIM — u
 - Reminders now go out every **8 AM & 2 PM** to whoever is due. (Change `RUN_HOURS`,
   `REMIND_DAYS_BEFORE`, etc. at the top.)
 
+## 5. Instant payment receipts (optional) — email on every payment
+The reminder job above nudges people *before* a due date. This extra step emails a debtor a
+**receipt the moment you record their payment** in the app (remaining balance included).
+
+1. Same script — the `doPost` / `sendPaymentConfirm_` functions are already in `AutoReminders.gs`.
+   Make sure `var SECRET` (top of the file) matches `PAYMENT_SYNC_SECRET` in the app's `app.js`.
+2. **Deploy → New deployment** → gear ⚙ → type **Web app**.
+   - **Description:** anything · **Execute as:** *Me* · **Who has access:** *Anyone* → **Deploy**.
+   - Approve permissions if asked. Copy the **Web app URL** (ends in `/exec`).
+3. Give that `/exec` URL to Claude → it goes into `PAYMENT_SYNC_URL` in `app.js`, then a rebuild +
+   redeploy of the app. From then on, recording a payment auto-emails the debtor.
+
+> Re-deploying the script later: **Deploy → Manage deployments → edit (✏) → Version: New version**
+> keeps the **same** `/exec` URL (no app change needed).
+
 ---
 
 ## Good to know

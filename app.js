@@ -18,6 +18,12 @@ const SIGNUP_FORM_URL = "https://forms.gle/g5ENoD8kL1yZ22hn7";
 const SIGNUP_FORM_PREFILL =
   "https://docs.google.com/forms/d/e/1FAIpQLSeVrw7bMT0odS9AcfpJYqLQQAvWqiRym1m1DJfQP4h7dUEuJQ/viewform?usp=pp_url&entry.2093344895=";
 
+/* Automatic payment-confirmation email (optional). Deploy the Apps Script as a Web App on your
+   dedicated account, paste its /exec URL below, and keep PAYMENT_SYNC_SECRET matching the
+   script's SECRET. Blank URL = off → the in-app tap-to-send receipt is used instead. */
+const PAYMENT_SYNC_URL = "";
+const PAYMENT_SYNC_SECRET = "dt-pay-9oytk60";
+
 /* -------------------- Helpers -------------------- */
 
 /** Format a number as Philippine Peso, e.g. 1234.5 -> ₱1,234.50 */
@@ -122,25 +128,15 @@ function applyHideAmounts() {
 }
 
 /* -------------------- Reminders sync (opt-in) -------------------- */
-/* When a Web App URL is set (Settings → Auto reminders), the app POSTs debtor +
-   payment events to that Google Apps Script endpoint. With no URL, nothing is
-   sent and the app stays fully offline/private. */
+/* When PAYMENT_SYNC_URL is set, recording a payment POSTs it to the Google Apps Script
+   Web App, which emails the debtor an instant receipt. With no URL, nothing is sent and
+   the app stays fully offline/private (the in-app tap-to-send receipt is used instead). */
 
 function getSyncConfig() {
-  try {
-    return {
-      url: (localStorage.getItem("dt_syncUrl") || "").trim(),
-      token: (localStorage.getItem("dt_syncToken") || "").trim(),
-    };
-  } catch (e) {
-    return { url: "", token: "" };
-  }
-}
-function setSyncConfig(url, token) {
-  try {
-    localStorage.setItem("dt_syncUrl", (url || "").trim());
-    localStorage.setItem("dt_syncToken", (token || "").trim());
-  } catch (e) {}
+  return {
+    url: (typeof PAYMENT_SYNC_URL === "string" ? PAYMENT_SYNC_URL : "").trim(),
+    token: (typeof PAYMENT_SYNC_SECRET === "string" ? PAYMENT_SYNC_SECRET : "").trim(),
+  };
 }
 
 /** Fire-and-forget POST (no-cors: request is delivered, reply isn't readable). */
@@ -656,7 +652,6 @@ function openAddDebtor() {
       });
       closeModal();
       toast("Debtor added.");
-      syncDebtorById(id); // push to the reminders sheet (if sync is set up)
       loadDebtors(true);
     }
   );
@@ -1165,7 +1160,6 @@ async function editDebtor(id) {
       closeModal();
       toast("Updated.");
       currentDetailKey = normName(name); // follow a possible rename
-      syncDebtorById(id);
       refreshCurrentView();
     }
   );
@@ -1739,7 +1733,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.18";
+const APP_VERSION = "3.19";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
