@@ -8,15 +8,15 @@
    When set, the app silently pulls new sign-ups on every open. Leave "" to disable.
    Example: https://docs.google.com/spreadsheets/d/e/XXXX/pub?output=csv        */
 const SIGNUP_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9C-8OsHbzzUyZgHhNVNeiPB4ocd4KjneeJisU16ntos4JTjm2DftMSsZRlDiAtqLf4953AKZfNtt7/pub?gid=2050044964&single=true&output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSUpcJAbyjSGqxjCFfLaAcNGUgOGkII1jWD1uQWqwG7TkZSS4hkXCx18IySlfz6gilGz1u_Rfelttp9/pub?gid=91289261&single=true&output=csv";
 
 /* The Google Form debtors fill in. SIGNUP_FORM_URL = the plain public link (Form → Send → link).
    SIGNUP_FORM_PREFILL = OPTIONAL, for multi-lender routing: the form's pre-filled link up to and
    including the Code field, e.g. ".../viewform?usp=pp_url&entry.123456789=" — the app appends this
    device's auto-generated tag so each lender's sign-ups route back to their own device. */
-const SIGNUP_FORM_URL = "https://forms.gle/ZJgtq5qgWeik96NK8";
+const SIGNUP_FORM_URL = "https://forms.gle/g5ENoD8kL1yZ22hn7";
 const SIGNUP_FORM_PREFILL =
-  "https://docs.google.com/forms/d/e/1FAIpQLSf3IKrM3HoNu53sy-31qttfOR1PVsqcJ4tye8DIomnof73B6Q/viewform?usp=pp_url&entry.2093344895=";
+  "https://docs.google.com/forms/d/e/1FAIpQLSeVrw7bMT0odS9AcfpJYqLQQAvWqiRym1m1DJfQP4h7dUEuJQ/viewform?usp=pp_url&entry.2093344895=";
 
 /* -------------------- Helpers -------------------- */
 
@@ -1739,7 +1739,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.17";
+const APP_VERSION = "3.18";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

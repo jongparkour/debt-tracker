@@ -74,8 +74,10 @@ auto-imports on open. **Backend-configured feed, per-device filtering:**
   If the sheet HAS a Code column, `pullSignups()` imports **only rows whose Code matches** this device's
   code (many lenders, each seeing theirs). If there's **no Code column** (or code left blank) it's
   single-lender mode → imports everyone. "Phone number" is accepted as an alias for "Phone".
-- Config is LIVE: `SIGNUP_FORM_URL` (forms.gle/ZJgtq5qgWeik96NK8) + `SIGNUP_FORM_PREFILL`
-  (form `1FAIpQLSf3IKrM3HoNu53sy-31qttfOR1PVsqcJ4tye8DIomnof73B6Q`, Code entry `2093344895`).
+- Config is LIVE on a **dedicated Google account**: `SIGNUP_FORM_URL` (forms.gle/g5ENoD8kL1yZ22hn7)
+  + `SIGNUP_FORM_PREFILL` (form `1FAIpQLSeVrw7bMT0odS9AcfpJYqLQQAvWqiRym1m1DJfQP4h7dUEuJQ`, Code entry
+  `2093344895`) + new `SIGNUP_CSV_URL` (sheet `…2PACX-1vSUpcJ…`, gid 91289261). Reminder emails
+  (Apps Script) also send from that dedicated account.
   Each device auto-generates a tag (`ensureLenderCode`, since prefill is set) and shows its own
   personalized sign-up link + QR in **Settings → Debtor sign-up link** (`signupShareLink()`).
   Lenders share *that* link so their debtors' rows carry their tag.
