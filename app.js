@@ -604,6 +604,57 @@ function buildPersons(debtors, allPayments) {
 
 /* -------------------- Debtor CRUD -------------------- */
 
+/** Primary "Add debtor" action: show the sign-up QR/link so the debtor self-registers
+ *  (→ lands in the sheet → gets automatic reminders). Falls back to the manual form if
+ *  no sign-up link is configured. */
+function openSignupQR() {
+  const link = (window.signupShareLink ? signupShareLink() : "") || SIGNUP_FORM_URL || "";
+  if (!link) return openAddDebtor(); // no form configured → manual add
+  openModal(
+    "Add debtor",
+    `
+    <p class="muted modal-intro">Have the debtor scan this (or open the link) to sign up.
+      They'll appear here automatically and get payment reminders.</p>
+    <div class="qr-box">
+      <div class="qr-img" id="add_qr"></div>
+      <p class="qr-cap">Scan to sign up as a debtor</p>
+      <div class="qr-actions">
+        <button type="button" class="btn small" id="add_copy">Copy link</button>
+        <button type="button" class="btn small hidden" id="add_share">Share…</button>
+      </div>
+    </div>
+    <button type="button" class="link-btn" id="add_manual">Or add manually (no reminders)</button>
+  `,
+    null
+  );
+  $("modalSave").style.display = "none";
+  $("modalCancel").textContent = "Close";
+  try {
+    const qr = window.qrcode(0, "M");
+    qr.addData(link);
+    qr.make();
+    $("add_qr").innerHTML = qr.createImgTag(5, 16, "Sign-up form");
+  } catch (e) {}
+  $("add_copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Link copied.");
+    } catch (e) {
+      toast("Couldn't copy — long-press the link to copy it.");
+    }
+  });
+  const sh = $("add_share");
+  if (navigator.share) {
+    sh.classList.remove("hidden");
+    sh.addEventListener("click", () =>
+      navigator
+        .share({ title: "Sign up", text: "Add yourself as a debtor:", url: link })
+        .catch(() => {})
+    );
+  }
+  $("add_manual").addEventListener("click", openAddDebtor);
+}
+
 /** Open the Add-debtor modal: Name, Amount, Due date, Note, + optional rule/target. */
 function openAddDebtor() {
   openModal(
@@ -1621,8 +1672,8 @@ async function importDataCSV(file) {
 /* -------------------- Event wiring -------------------- */
 
 // Add-debtor buttons (header + empty state) open the modal
-$("addDebtorBtn").addEventListener("click", openAddDebtor);
-$("emptyAddBtn").addEventListener("click", openAddDebtor);
+$("addDebtorBtn").addEventListener("click", openSignupQR);
+$("emptyAddBtn").addEventListener("click", openSignupQR);
 
 // Search + filter
 $("search").addEventListener("input", (e) => {
@@ -1734,7 +1785,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.20";
+const APP_VERSION = "3.21";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

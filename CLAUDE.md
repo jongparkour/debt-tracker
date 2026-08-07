@@ -91,8 +91,10 @@ auto-imports on open. **Backend-configured feed, per-device filtering:**
   `2093344895`) + new `SIGNUP_CSV_URL` (sheet `…2PACX-1vSUpcJ…`, gid 91289261). Reminder emails
   (Apps Script) also send from that dedicated account.
   Each device auto-generates a tag (`ensureLenderCode`, since prefill is set) and shows its own
-  personalized sign-up link + QR in **Settings → Debtor sign-up link** (`signupShareLink()`).
-  Lenders share *that* link so their debtors' rows carry their tag.
+  personalized sign-up link + QR. As of v3.21 the **"+ Add debtor" button opens that QR directly**
+  (`openSignupQR()` in app.js — QR + Copy/Share, plus a subtle "Or add manually" link that falls
+  back to `openAddDebtor()`). The old Settings "Debtor sign-up link" card was removed. Lenders
+  share *that* link so their debtors' rows carry their tag.
 - Adds only **new** names (de-duped by `normName`, never overwrites). Falls back to manual
   **Import CSV** on fetch failure. Import needs only Name + Total Debt. Guide: `signup-form.md`.
 - Updates on app open only (no closed-app push without the Pro backend).

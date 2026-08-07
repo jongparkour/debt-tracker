@@ -1124,6 +1124,20 @@ body.modal-open { overflow: hidden; }
 .qr-cap { margin: 12px 0; font-size: 0.76rem; color: var(--muted); }
 .qr-actions { display: flex; gap: 8px; justify-content: center; }
 
+/* Subtle text link (e.g. "Or add manually") */
+.link-btn {
+  display: block;
+  margin: 18px auto 2px;
+  background: none;
+  border: none;
+  padding: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--ink); }
+
 /* Danger / lock card */
 .danger-card {
   display: flex;
