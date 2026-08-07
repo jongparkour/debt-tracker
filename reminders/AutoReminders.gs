@@ -21,10 +21,10 @@ var REMIND_DAYS_BEFORE = [7, 3, 1];  // remind this many days before due
 var REMIND_WHEN_OVERDUE = true;      // keep reminding while overdue
 var RUN_HOURS = [8, 14];             // daily run times (morning + afternoon)
 
-// SMS via textbee.dev — install the textbee app on your phone, then paste these.
-// Leave BOTH blank to send email only (no SMS).
-var TEXTBEE_API_KEY = "";
-var TEXTBEE_DEVICE_ID = "";
+// SMS via SMSGate (sms-gate.app) in CLOUD mode — install the app on your phone, switch it to
+// "Cloud Server", and paste the username/password it shows here. Blank = email only.
+var SMSGATE_USER = "";
+var SMSGATE_PASS = "";
 // =================================================
 
 /** Daily job (set two triggers via createTriggers). Emails + texts whoever is due. */
@@ -107,7 +107,7 @@ function sendReminders() {
         done.push("email");
       } catch (e) { done.push("email-ERR"); }
     }
-    if (phone && TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID) {
+    if (phone && SMSGATE_USER && SMSGATE_PASS) {
       try {
         sendSms_(phone, "Hi " + name + ", " + lead + " Thank you! - " + SENDER_NAME);
         done.push("sms");
@@ -121,14 +121,13 @@ function sendReminders() {
   Logger.log("Reminders processed (" + slot + "): " + sentCount);
 }
 
-/** Send one SMS through the textbee.dev gateway (your phone → your SIM). */
+/** Send one SMS through SMSGate cloud (your phone → your SIM). */
 function sendSms_(phone, text) {
-  var url = "https://api.textbee.dev/api/v1/gateway/devices/" + TEXTBEE_DEVICE_ID + "/send-sms";
-  var res = UrlFetchApp.fetch(url, {
+  var res = UrlFetchApp.fetch("https://api.sms-gate.app/3rdparty/v1/message", {
     method: "post",
     contentType: "application/json",
-    headers: { "x-api-key": TEXTBEE_API_KEY },
-    payload: JSON.stringify({ recipients: [phone], message: text }),
+    headers: { Authorization: "Basic " + Utilities.base64Encode(SMSGATE_USER + ":" + SMSGATE_PASS) },
+    payload: JSON.stringify({ message: text, phoneNumbers: [phone] }),
     muteHttpExceptions: true,
   });
   var code = res.getResponseCode();
@@ -152,7 +151,7 @@ function sendTest() {
   var me = Session.getActiveUser().getEmail();
   MailApp.sendEmail({ to: me, name: SENDER_NAME, subject: "Debt Tracker — test",
     htmlBody: htmlEmail_("Test", '<p>If you got this, email works. ✓</p>'), body: "Email works." });
-  if (TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID && TEST_PHONE) sendSms_(TEST_PHONE, "Debt Tracker test SMS ✓");
+  if (SMSGATE_USER && SMSGATE_PASS && TEST_PHONE) sendSms_(TEST_PHONE, "Debt Tracker test SMS ✓");
   Logger.log("Test sent.");
 }
 

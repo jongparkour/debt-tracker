@@ -26,19 +26,19 @@ are scheduled off it.)
    (**Review permissions → your account → Advanced → Go to project → Allow**).
 2. Check your inbox for the test. ✓
 
-## 3. (Optional) Turn on SMS — free via your phone
-Apps Script can't send SMS itself, so your **phone** sends it (on your SIM — use an unli-text
-plan). Easiest gateway: **textbee.dev** (free 50 SMS/day).
-1. On your Android phone, install **textbee** (textbee.dev) and follow its app to **register the
-   device** → you get an **API key** and a **Device ID**.
-2. In the script config (top), fill:
+## 3. Turn on SMS — free via your phone (SMSGate)
+Apps Script can't send SMS itself, so your **phone** sends it (on your SIM — use an unli-text plan).
+1. On your Android phone, install **SMS Gateway** (from **sms-gate.app** — Google Play or their APK).
+2. Open it and switch the mode to **Cloud Server**. It shows a **username** and **password** —
+   those are your API credentials.
+3. In the script config (top), fill:
    ```js
-   var TEXTBEE_API_KEY  = "your-api-key";
-   var TEXTBEE_DEVICE_ID = "your-device-id";
+   var SMSGATE_USER = "your-username";
+   var SMSGATE_PASS = "your-password";
    ```
-3. (Test SMS: set `TEST_PHONE` to your number and run `sendTest`.)
-> Prefer fully-open-source? **SMSGate (sms-gate.app)** works too — just swap the URL/auth in the
-> `sendSms_` function. Keep the phone on with signal; exclude the gateway app from battery saving.
+4. Keep the app running, phone **on with signal**, and **exclude it from battery optimization**
+   (Settings → Battery → set the app to *Unrestricted*) so it stays connected.
+5. Test: set `TEST_PHONE` to your own number, then run **`sendTest`**.
 
 ## 4. Schedule it
 - Function dropdown → **`createTriggers`** → **Run** (once).
