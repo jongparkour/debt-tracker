@@ -351,13 +351,28 @@
     panel("lockUnlock");
     show($("lockScreen"));
     hide($("settingsBtn"));
+    msg($("lockUnlockMsg"), "");
     const bioBtn = $("bioUnlockBtn");
     if (biometricEnrolled() && (await biometricSupported())) {
       show(bioBtn);
+      // Biometric is the priority — prompt it automatically; PIN stays as fallback.
+      setTimeout(() => tryBiometricUnlock(true), 200);
     } else {
       hide(bioBtn);
     }
-    msg($("lockUnlockMsg"), "");
+  }
+
+  /** Attempt biometric unlock. auto=true is a silent priority attempt: if the browser
+   *  needs a tap first, or the user cancels, it falls back to the PIN quietly. */
+  async function tryBiometricUnlock(auto) {
+    if (!biometricEnrolled()) return;
+    if (!auto) msg($("lockUnlockMsg"), "Follow your device's prompt…");
+    try {
+      await unlockWithBiometric();
+      unlockApp();
+    } catch (err) {
+      msg($("lockUnlockMsg"), auto ? "" : "Biometric unlock failed. Use your PIN.");
+    }
   }
 
   /* ---------------- Settings (Change PIN + biometrics) ---------------- */
@@ -989,15 +1004,7 @@
       if (len && val.length === len) tryPin();
     });
 
-    $("bioUnlockBtn").addEventListener("click", async () => {
-      msg($("lockUnlockMsg"), "Follow your device's prompt…");
-      try {
-        await unlockWithBiometric();
-        unlockApp();
-      } catch (err) {
-        msg($("lockUnlockMsg"), "Biometric unlock failed. Use your PIN.");
-      }
-    });
+    $("bioUnlockBtn").addEventListener("click", () => tryBiometricUnlock(false));
 
     // Settings (single button: theme, PIN, biometrics, recovery, lock)
     $("settingsBtn").addEventListener("click", openSettings);
