@@ -21,7 +21,8 @@ const SIGNUP_FORM_PREFILL =
 /* Automatic payment-confirmation email (optional). Deploy the Apps Script as a Web App on your
    dedicated account, paste its /exec URL below, and keep PAYMENT_SYNC_SECRET matching the
    script's SECRET. Blank URL = off → the in-app tap-to-send receipt is used instead. */
-const PAYMENT_SYNC_URL = "";
+const PAYMENT_SYNC_URL =
+  "https://script.google.com/macros/s/AKfycbzg1K8qJXVB4_QQfBtGAk6V0A8lYA7EW57xLcvfVSOf4zFY2u4POT1w8qNJmyDz7K_M7w/exec";
 const PAYMENT_SYNC_SECRET = "dt-pay-9oytk60";
 
 /* -------------------- Helpers -------------------- */
@@ -1733,7 +1734,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.19";
+const APP_VERSION = "3.20";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
