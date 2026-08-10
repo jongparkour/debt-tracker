@@ -216,15 +216,30 @@ function expectations(person) {
   };
 }
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
 /** Nominal weekly amount from a monthly expected (server splits it precisely per month's
- *  weekends; in-app we show the ÷4 estimate). */
+ *  due-days; in-app we show the ÷4 estimate). */
 function weeklyFromMonthly(monthly) {
   return Math.round((Number(monthly) || 0) / 4);
 }
 
-/** Plain-language plan summary. The monthly expected is the basis; a weekly plan is reminded
- *  every weekend for the monthly split across the month's weekends. */
-function planSummary(total, freq, monthly) {
+/** "1" -> "1st", "22" -> "22nd", etc. */
+function ordinal(n) {
+  n = Number(n) || 1;
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/** Human day-of-plan: weekday name (weekly) or "the Nth" (monthly). */
+function planDayLabel(freq, planDay) {
+  return freq === "weekly"
+    ? WEEKDAYS[Number(planDay)] || "Saturday"
+    : "the " + ordinal(planDay || 1);
+}
+
+/** Plain-language plan summary: rate, due day, and how long to clear. */
+function planSummary(total, freq, monthly, planDay) {
   const M = Number(monthly) || 0;
   total = Number(total) || 0;
   if (!(M > 0)) return "";
@@ -234,12 +249,12 @@ function planSummary(total, freq, monthly) {
     dur = ` · clears in ~${months} month${months !== 1 ? "s" : ""}`;
   }
   return freq === "weekly"
-    ? `≈ ${peso(weeklyFromMonthly(M))}/weekend (${peso(M)}/mo split by week)${dur}`
-    : `${peso(M)}/month${dur}`;
+    ? `≈ ${peso(weeklyFromMonthly(M))} every ${planDayLabel("weekly", planDay)} (${peso(M)}/mo split by week)${dur}`
+    : `${peso(M)} on ${planDayLabel("monthly", planDay)} of each month${dur}`;
 }
 
-/** HTML for the Payment-plan fields: the monthly expected (basis) + reminder cadence toggle.
- *  `prefix` namespaces the element ids (e.g. "a_" or "m_"). `monthly` = expected monthly ₱. */
+/** HTML for the Payment-plan fields: monthly expected (basis) + cadence toggle + due-day picker.
+ *  `prefix` namespaces ids (e.g. "a_" / "m_"). `monthly` = expected monthly ₱. */
 function planFieldsHtml(prefix, freq, monthly) {
   freq = freq === "weekly" ? "weekly" : "monthly";
   return `
@@ -253,34 +268,68 @@ function planFieldsHtml(prefix, freq, monthly) {
         <button type="button" class="seg-btn ${freq === "monthly" ? "active" : ""}" data-freq="monthly">Monthly</button>
       </div>
     </div>
+    <div class="field"><label id="${prefix}dayLabel">Due day</label>
+      <select id="${prefix}planDay"></select></div>
     <p class="plan-hint" id="${prefix}planHint"></p>`;
 }
 
-/** Wire the plan fields: toggle cadence + live summary from the monthly amount and total owed.
- *  Returns a reader for {planFreq, planAmount} where planAmount is the expected MONTHLY ₱. */
-function wirePlanFields(prefix, totalInputId) {
+/** Wire the plan fields: cadence toggle, due-day picker (weekday vs day-of-month), live summary.
+ *  Returns a reader for {planFreq, planAmount (monthly), planDay}. */
+function wirePlanFields(prefix, totalInputId, initialDay) {
   const seg = $(prefix + "planSeg");
   const amtEl = $(prefix + "planAmt");
   const hintEl = $(prefix + "planHint");
+  const dayEl = $(prefix + "planDay");
+  const dayLabel = $(prefix + "dayLabel");
   const activeBtn = seg.querySelector(".seg-btn.active");
-  const state = { freq: activeBtn ? activeBtn.dataset.freq : "monthly" };
+  const now = new Date();
+  const state = {
+    freq: activeBtn ? activeBtn.dataset.freq : "monthly",
+    day: initialDay != null && initialDay !== "" ? Number(initialDay) : null,
+  };
+  function populateDays() {
+    dayLabel.textContent = state.freq === "weekly" ? "Due day (each week)" : "Due day (each month)";
+    let opts = "";
+    if (state.freq === "weekly") {
+      const def = state.day != null && state.day >= 0 && state.day <= 6 ? state.day : now.getDay();
+      for (let d = 0; d < 7; d++)
+        opts += `<option value="${d}" ${d === def ? "selected" : ""}>${WEEKDAYS[d]}</option>`;
+    } else {
+      const def = state.day != null && state.day >= 1 && state.day <= 28 ? state.day : Math.min(now.getDate(), 28);
+      for (let d = 1; d <= 28; d++)
+        opts += `<option value="${d}" ${d === def ? "selected" : ""}>${ordinal(d)}</option>`;
+    }
+    dayEl.innerHTML = opts;
+    state.day = Number(dayEl.value);
+  }
   function refresh() {
     const totalEl = $(totalInputId);
     const total = totalEl ? Number(totalEl.value) || 0 : 0;
-    hintEl.textContent = planSummary(total, state.freq, amtEl.value) || "";
+    hintEl.textContent = planSummary(total, state.freq, amtEl.value, state.day) || "";
   }
   seg.querySelectorAll(".seg-btn").forEach((b) =>
     b.addEventListener("click", () => {
       state.freq = b.dataset.freq;
+      state.day = null; // reset to a sensible default for the new cadence
       seg.querySelectorAll(".seg-btn").forEach((x) => x.classList.toggle("active", x === b));
+      populateDays();
       refresh();
     })
   );
+  dayEl.addEventListener("change", () => {
+    state.day = Number(dayEl.value);
+    refresh();
+  });
   amtEl.addEventListener("input", refresh);
   const totalEl = $(totalInputId);
   if (totalEl) totalEl.addEventListener("input", refresh);
+  populateDays();
   refresh();
-  return () => ({ planFreq: state.freq, planAmount: Number(amtEl.value) || 0 });
+  return () => ({
+    planFreq: state.freq,
+    planAmount: Number(amtEl.value) || 0,
+    planDay: Number(dayEl.value),
+  });
 }
 
 /** The monthly-equivalent target the ledger/expectations use (planAmount is already monthly). */
@@ -481,6 +530,7 @@ async function syncDebtorById(repId, paymentAmount) {
       remaining: Math.max(0, person.remaining),
       planFreq: person.planFreq === "weekly" ? "weekly" : "monthly",
       monthly: Number(person.planAmount) || Number(person.monthlyTarget) || 0,
+      planDay: person.planDay != null ? Number(person.planDay) : person.planFreq === "weekly" ? 6 : 1,
     };
     if (paymentAmount)
       postSync("payment_added", { ...base, amount: Number(paymentAmount) });
@@ -680,9 +730,11 @@ function buildPersons(debtors, allPayments) {
       // planAmount is the expected MONTHLY amount (falls back to a legacy monthlyTarget).
       p.planAmount =
         Number(pl.planAmount) > 0 ? Number(pl.planAmount) : Number(pl.monthlyTarget) || 0;
+      p.planDay = pl.planDay != null ? Number(pl.planDay) : p.planFreq === "weekly" ? 6 : 1;
     } else {
       p.planFreq = "monthly";
       p.planAmount = 0;
+      p.planDay = 1;
     }
   });
   // Sort: unsettled first, then by name.
@@ -750,7 +802,7 @@ function openSignupQR() {
 
 /** Open the Add-debtor modal: Name, Amount, Due date, Note + a weekly/monthly payment plan. */
 function openAddDebtor() {
-  let readPlan = () => ({ planFreq: "monthly", planAmount: 0 });
+  let readPlan = () => ({ planFreq: "monthly", planAmount: 0, planDay: 1 });
   openModal(
     "Add debtor",
     `
@@ -778,11 +830,11 @@ function openAddDebtor() {
       const email = $("a_email").value.trim();
       const phone = $("a_phone").value.trim();
       const note = $("a_note").value.trim();
-      const { planFreq, planAmount } = readPlan();
+      const { planFreq, planAmount, planDay } = readPlan();
       const monthlyTarget = planMonthly(planFreq, planAmount);
 
       const id = await DebtorsDB.add({
-        name, totalDebt, planFreq, planAmount, monthlyTarget, note, email, phone,
+        name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note, email, phone,
       });
       closeModal();
       toast("Debtor added.");
@@ -1176,7 +1228,8 @@ async function showDetail(repId) {
       ? `<p class="rule">🗓️ Plan: <b>${planSummary(
           planBasis,
           person.planFreq,
-          person.planAmount
+          person.planAmount,
+          person.planDay
         )}</b> <span class="muted">· basis for reminders</span></p>`
       : target > 0
       ? `<p class="rule">🎯 Expected monthly payment: <b>${peso(target)}</b></p>`
@@ -1273,7 +1326,8 @@ async function editDebtor(id) {
 
   const initFreq = d.planFreq === "weekly" ? "weekly" : "monthly";
   const initAmt = Number(d.planAmount) > 0 ? d.planAmount : d.monthlyTarget || "";
-  let readPlan = () => ({ planFreq: initFreq, planAmount: Number(initAmt) || 0 });
+  const initDay = d.planDay != null ? d.planDay : "";
+  let readPlan = () => ({ planFreq: initFreq, planAmount: Number(initAmt) || 0, planDay: Number(initDay) || 1 });
 
   openModal(
     "Edit Debt Entry",
@@ -1296,7 +1350,7 @@ async function editDebtor(id) {
     async () => {
       const name = $("m_name").value.trim();
       const totalDebt = Number($("m_debt").value);
-      const { planFreq, planAmount } = readPlan();
+      const { planFreq, planAmount, planDay } = readPlan();
       const monthlyTarget = planMonthly(planFreq, planAmount);
       const note = $("m_note").value.trim();
       const email = $("m_email").value.trim();
@@ -1304,7 +1358,7 @@ async function editDebtor(id) {
       if (!name) return toast("Name is required.");
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      await DebtorsDB.put({ ...d, name, totalDebt, planFreq, planAmount, monthlyTarget, note, email, phone });
+      await DebtorsDB.put({ ...d, name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note, email, phone });
       closeModal();
       toast("Updated.");
       currentDetailKey = normName(name); // follow a possible rename
@@ -1312,12 +1366,12 @@ async function editDebtor(id) {
       refreshCurrentView();
     }
   );
-  readPlan = wirePlanFields("m_", "m_debt");
+  readPlan = wirePlanFields("m_", "m_debt", initDay);
 }
 
 /** Add another debt entry under an existing person (same name). */
 function addLoan(name) {
-  let readPlan = () => ({ planFreq: "monthly", planAmount: 0 });
+  let readPlan = () => ({ planFreq: "monthly", planAmount: 0, planDay: 1 });
   openModal(
     "Add debt for " + name,
     `
@@ -1329,12 +1383,12 @@ function addLoan(name) {
   `,
     async () => {
       const totalDebt = Number($("m_debt").value);
-      const { planFreq, planAmount } = readPlan();
+      const { planFreq, planAmount, planDay } = readPlan();
       const monthlyTarget = planMonthly(planFreq, planAmount);
       const note = $("m_note").value.trim();
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      const nid = await DebtorsDB.add({ name, totalDebt, planFreq, planAmount, monthlyTarget, note });
+      const nid = await DebtorsDB.add({ name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note });
       closeModal();
       toast("Debt entry added.");
       syncDebtorById(nid); // re-sync the plan to the reminder engine
@@ -1877,7 +1931,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.23";
+const APP_VERSION = "3.24";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

@@ -1,17 +1,28 @@
 # 📧 Plan-based automatic reminders + receipts (Apps Script)
 
-`AutoReminders.gs` runs on Google's servers and emails each debtor based on the **payment plan**
-you set in the app — **no due date needed, the plan cadence IS the schedule**:
+`AutoReminders.gs` runs on Google's servers and emails each debtor based on the **payment plan +
+due day** you set in the app — **no due-date column needed, the plan IS the schedule**:
 
-- **Weekly plan** → an email **every weekend (Saturday)**. The weekend amount is the expected
-  **monthly** payment split across that month's weekends. Start a debtor mid-month and the split
-  covers only the **remaining** weekends, so that month still totals the monthly expected.
-- **Monthly plan** → an email on the **1st** of each month for the expected monthly amount.
-- **On every payment** → an instant **receipt**; once the balance hits ₱0 → a **"fully paid"** email.
-- Reminders **stop automatically** when the balance is cleared.
+- **On the due day → two reminders (8 AM & 2 PM).**
+  - **Weekly plan** → the due day is a **weekday** you pick (e.g. every Friday). The amount is the
+    expected **monthly** split across that weekday's occurrences in the month (mid-month start →
+    split across the ones remaining).
+  - **Monthly plan** → the due day is a **day-of-month** you pick (e.g. the 15th) for the full
+    monthly amount.
+- **The next day → one OVERDUE follow-up (8 AM & 2 PM)** if no payment was recorded on the due day.
+- **On every payment** → an instant **receipt**; once the balance hits ₱0 → a **"fully paid ✓"** email.
+- Amounts are capped at the remaining balance; reminders **stop** when it's cleared.
 
-The app syncs each debtor's plan + live balance to this Web App (the same private endpoint your
-payment receipts use). A **"Reminders"** tab is created automatically to track everyone.
+The app syncs each debtor's plan + due day + live balance to this Web App (the same private
+endpoint your payment receipts use). A **"Reminders"** tab is created automatically to track everyone.
+
+### How the pieces fit (Forms → Sheet → App → Apps Script)
+- **Google Form + its responses sheet** = the **sign-up inbox** only (Name, Total, Email, Phone,
+  Code). The app imports new sign-ups from it. **Remove the form's old "Due Date" question — it's
+  no longer used.** The lender sets the plan + due day in the app after import.
+- **App** = the source of truth for each debtor's **plan** (monthly amount, weekly/monthly, due day)
+  and payments. It syncs them to the Web App.
+- **"Reminders" tab (auto-created)** = what the reminder engine reads. You don't edit it by hand.
 
 ---
 
@@ -29,17 +40,18 @@ payment receipts use). A **"Reminders"** tab is created automatically to track e
 ## 3. Schedule the daily job
 - **Project Settings ⚙ → Time zone** → your zone (e.g. GMT+8 Manila).
 - Function dropdown → **`sendTest`** → Run → approve → check your inbox for a sample reminder.
-- Function dropdown → **`createTriggers`** → Run once. The job now runs daily at 9:00 and sends
-  whatever is due (weekend reminders on Saturdays, monthly on the 1st).
+- Function dropdown → **`createTriggers`** → Run once. The job now runs daily at **8 AM & 2 PM**
+  and sends whatever is due that day (plus next-day overdue follow-ups).
 
 ---
 
 ## How the amounts work
-- You enter one number per debtor: the **expected monthly payment** (e.g. ₱2,400), plus a
-  **Weekly / Monthly** reminder cadence.
-- **Monthly** → reminds ₱2,400 on the 1st.
-- **Weekly** → reminds ₱2,400 ÷ (weekends that month) each Saturday. Added in the 2nd week with
-  3 weekends left → ₱800 each of those 3 weekends; the next full month → ₱2,400 ÷ 4 ≈ ₱600.
+- Per debtor you set: **expected monthly payment** (e.g. ₱2,400), a **Weekly / Monthly** cadence,
+  and a **due day** (a weekday for weekly, a day-of-month for monthly).
+- **Monthly** → reminds ₱2,400 on your chosen day (e.g. the 15th), 8 AM & 2 PM.
+- **Weekly** → reminds ₱2,400 ÷ (that weekday's occurrences that month) on your chosen weekday.
+  Added mid-month with 3 of that weekday left → ₱800 each; the next full month → ₱2,400 ÷ 4 ≈ ₱600.
+- Miss the due day → an **overdue** email the next day (8 AM & 2 PM).
 - Every amount is **capped at the remaining balance**, so the last reminder is never more than owed.
 
 ## Good to know

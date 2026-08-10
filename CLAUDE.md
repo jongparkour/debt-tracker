@@ -52,31 +52,34 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - View stats at Cloudflare dashboard → Web Analytics → hostname `iridescent-mooncake-68869c.netlify.app`.
 
 ## Payment plans (v3.22+) — the basis of all reminders
-Each debtor has a **plan**, set in Add/Edit: an **expected monthly payment** (`monthlyTarget`,
-also stored as `planAmount`) + a reminder cadence `planFreq` = `"weekly"` | `"monthly"`. **There
-is NO due date field anymore — the plan cadence IS the schedule.** Helpers in `app.js`:
-`planFieldsHtml`/`wirePlanFields` (monthly amount + Weekly/Monthly toggle + live `planSummary`),
-`weeklyFromMonthly` (÷4 in-app estimate), `expectations()` (period-aware: weekly = monthly/4).
-`buildPersons` carries `planFreq`/`planAmount` (monthly); legacy debtors → monthly with their old
-`monthlyTarget`. Cards/detail show `≈₱600/wk` or `₱2,400/mo`.
+Each debtor has a **plan**, set in Add/Edit: an **expected monthly payment** (`monthlyTarget`, also
+stored as `planAmount`) + cadence `planFreq` = `"weekly"|"monthly"` + a **due day** `planDay`
+(weekday 0–6 for weekly, day-of-month 1–28 for monthly). **No due-date field — the plan + due day
+ARE the schedule.** Helpers in `app.js`: `planFieldsHtml`/`wirePlanFields` (monthly amount +
+cadence toggle + due-day `<select>` that swaps weekday⇄day-of-month + live `planSummary`),
+`weeklyFromMonthly` (÷4 estimate), `WEEKDAYS`/`ordinal`/`planDayLabel`, `expectations()`
+(period-aware). `buildPersons` carries `planFreq`/`planAmount`/`planDay`; legacy debtors → monthly
+with their old `monthlyTarget`, `planDay` default (weekly 6 / monthly 1).
 
 ## Reminders — plan-based, automatic (wired, live)
 **In-app tap-to-send (free, offline):** tap **✉️/💬** on a debtor → `mailto:`/`sms:` reminder that
 emphasises the chosen plan period. Recording a payment shows a **receipt** modal.
 
 **Server-side automatic (Gmail via Apps Script Web App):**
-- The app **syncs each debtor's plan + live balance** to `PAYMENT_SYNC_URL`. `syncDebtorById(id[,amt])`
-  → `postSync("debtor_upsert" | "payment_added", {key,name,email,total,paid,remaining,planFreq,monthly[,amount]})`
-  (no-cors; offline queue `dt_syncQueue` flushes on boot). Called on add / edit / addLoan / payment.
+- The app **syncs each debtor's plan + due day + live balance** to `PAYMENT_SYNC_URL`.
+  `syncDebtorById(id[,amt])` → `postSync("debtor_upsert" | "payment_added",
+  {key,name,email,total,paid,remaining,planFreq,monthly,planDay[,amount]})` (no-cors; offline queue
+  `dt_syncQueue` flushes on boot). Called on add / edit / addLoan / payment.
 - Config at top of `app.js`: `PAYMENT_SYNC_URL` (blank = off → tap-to-send only) + `PAYMENT_SYNC_SECRET`
   (`dt-pay-9oytk60`). `getSyncConfig()` returns these constants.
-- Engine = `reminders/AutoReminders.gs` (rewritten v3.22): `doPost` upserts a **"Reminders"** tab
-  (Email|Name|Freq|Monthly|Remaining|Enrolled|Active|LastWeekly|LastMonthly) and updates balance on
-  payments; `sendPlanReminders()` runs daily (trigger via `createTriggers`) →
-  **weekly plans email every Saturday** (amount = monthly ÷ that month's weekends, `weeklyAmount_`,
-  mid-month = only remaining weekends), **monthly plans email on the 1st**. Amounts capped at
-  remaining; stops when settled. `sendPaymentConfirm_` still sends the instant receipt + "fully
-  paid ✓" email. SMS dropped from the engine (email-only). Guide: `reminders/SETUP.md`.
+- Engine = `reminders/AutoReminders.gs` (rewritten v3.24): `doPost` upserts a **"Reminders"** tab
+  (Email|Name|Freq|Monthly|DueDay|Remaining|Enrolled|Active|LastPaid|LastSent) and on payments
+  updates Remaining + stamps LastPaid. `sendReminders()` runs at **8 AM & 2 PM** (two triggers via
+  `createTriggers`): on a debtor's **due day** it sends twice; the **next day** it sends an
+  **overdue** follow-up unless `LastPaid ≥ dueDay` (`dueToday_` decides). Weekly amount =
+  `weeklyAmount_` (monthly ÷ that weekday's occurrences that month; mid-month = remaining ones),
+  monthly = full amount; both capped at remaining. Dedupe per `yyyy-MM-dd + AM/PM` slot via
+  LastSent. `sendPaymentConfirm_` sends the receipt + "fully paid ✓". Email-only. Guide: `SETUP.md`.
 - **Redeploy after editing the .gs:** Manage deployments → ✏ → Version: New version (same `/exec` URL).
 
 **Pro request counter (still live):** Settings **"⚡ Upgrade to Pro"** → `pro-request.html`
