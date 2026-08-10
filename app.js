@@ -1304,6 +1304,10 @@ function openModal(title, bodyHtml, onSave) {
   $("modalTitle").textContent = title;
   $("modalBody").innerHTML = bodyHtml;
   modalSaveHandler = onSave;
+  // Reset the footer buttons — a prior dialog (e.g. the sign-up QR) may have hidden/renamed them.
+  $("modalSave").style.display = "";
+  $("modalSave").textContent = "Save";
+  $("modalCancel").textContent = "Cancel";
   $("modalOverlay").classList.remove("hidden");
   // Lock the background so it can't scroll while the panel is open.
   document.body.classList.add("modal-open");
@@ -1931,7 +1935,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.24";
+const APP_VERSION = "3.25";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
