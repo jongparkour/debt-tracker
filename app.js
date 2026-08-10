@@ -181,8 +181,8 @@ async function personFromRep(repId) {
   return buildPersons(debtors, pays).find((p) => p.key === normName(rep.name)) || null;
 }
 
-/** Weekly/monthly expectation from a debtor's Expected Monthly Payment (monthlyTarget).
- *  Weekly expected = monthly / 4. Returns null if no monthly target is set. */
+/** Expected payment per period, honouring the debtor's chosen plan frequency
+ *  (weekly or monthly). Weekly expected = monthly / 4. Returns null if no plan is set. */
 function expectations(person) {
   const target = Number(person.monthlyTarget) || 0;
   if (!(target > 0)) return null;
@@ -198,6 +198,12 @@ function expectations(person) {
   const weekPaid = sumSince(weekStart);
   const monthPaid = sumSince(monthStart);
   const weekly = Math.round(target / 4);
+  const freq = person.planFreq === "weekly" ? "weekly" : "monthly";
+  // The active period drives the reminders.
+  const period =
+    freq === "weekly"
+      ? { word: "weekly", label: "week", expected: weekly, paid: weekPaid, toGo: Math.max(0, weekly - weekPaid) }
+      : { word: "monthly", label: "month", expected: target, paid: monthPaid, toGo: Math.max(0, target - monthPaid) };
   return {
     target,
     weekly,
@@ -205,7 +211,83 @@ function expectations(person) {
     monthPaid,
     weekToGo: Math.max(0, weekly - weekPaid),
     monthToGo: Math.max(0, target - monthPaid),
+    freq,
+    period,
   };
+}
+
+/** Plain-language plan summary: the per-period rate, the other cadence, and how long
+ *  it takes to clear `total` at that rate. e.g. "₱600/week (≈ ₱2,400/mo) · 34 payments · ~8 months". */
+function planSummary(total, freq, amount) {
+  amount = Number(amount) || 0;
+  total = Number(total) || 0;
+  if (!(amount > 0)) return "";
+  const weekly = freq === "weekly";
+  const perMonth = weekly ? amount * 4 : amount;
+  const perWeek = weekly ? amount : Math.round(amount / 4);
+  const other = weekly ? `≈ ${peso(perMonth)}/mo` : `≈ ${peso(perWeek)}/wk`;
+  let dur = "";
+  if (total > 0) {
+    const periods = Math.ceil(total / amount);
+    const months = Math.max(1, Math.round(total / perMonth));
+    dur = ` · ${periods} payment${periods !== 1 ? "s" : ""} · ~${months} month${months !== 1 ? "s" : ""} to clear`;
+  }
+  return `${peso(amount)}/${weekly ? "week" : "month"} (${other})${dur}`;
+}
+
+/** HTML for the Payment-plan fields (frequency toggle + per-period amount + live summary).
+ *  `prefix` namespaces the element ids (e.g. "a_" or "m_"). */
+function planFieldsHtml(prefix, freq, amount) {
+  freq = freq === "weekly" ? "weekly" : "monthly";
+  const unit = freq === "weekly" ? "week" : "month";
+  return `
+    <div class="field"><label>Payment plan <span class="muted">(basis for reminders)</span></label>
+      <div class="plan-seg" id="${prefix}planSeg">
+        <button type="button" class="seg-btn ${freq === "weekly" ? "active" : ""}" data-freq="weekly">Weekly</button>
+        <button type="button" class="seg-btn ${freq === "monthly" ? "active" : ""}" data-freq="monthly">Monthly</button>
+      </div>
+    </div>
+    <div class="field"><label>Expected per <span id="${prefix}planUnit">${unit}</span> (₱)</label>
+      <input id="${prefix}planAmt" type="number" inputmode="decimal" min="0" placeholder="${
+        freq === "weekly" ? "e.g. 600" : "e.g. 2400"
+      }" value="${amount ? esc(amount) : ""}" /></div>
+    <p class="plan-hint" id="${prefix}planHint"></p>`;
+}
+
+/** Wire the plan fields: toggle frequency, live-update the unit label + summary from the
+ *  total-owed input. Returns a reader for the current {planFreq, planAmount}. */
+function wirePlanFields(prefix, totalInputId) {
+  const seg = $(prefix + "planSeg");
+  const amtEl = $(prefix + "planAmt");
+  const unitEl = $(prefix + "planUnit");
+  const hintEl = $(prefix + "planHint");
+  const activeBtn = seg.querySelector(".seg-btn.active");
+  const state = { freq: activeBtn ? activeBtn.dataset.freq : "monthly" };
+  function refresh() {
+    unitEl.textContent = state.freq === "weekly" ? "week" : "month";
+    const totalEl = $(totalInputId);
+    const total = totalEl ? Number(totalEl.value) || 0 : 0;
+    const s = planSummary(total, state.freq, amtEl.value);
+    hintEl.textContent = s ? "≈ " + s : "";
+  }
+  seg.querySelectorAll(".seg-btn").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.freq = b.dataset.freq;
+      seg.querySelectorAll(".seg-btn").forEach((x) => x.classList.toggle("active", x === b));
+      refresh();
+    })
+  );
+  amtEl.addEventListener("input", refresh);
+  const totalEl = $(totalInputId);
+  if (totalEl) totalEl.addEventListener("input", refresh);
+  refresh();
+  return () => ({ planFreq: state.freq, planAmount: Number(amtEl.value) || 0 });
+}
+
+/** Normalize a plan into the monthly-equivalent target the ledger/expectations use. */
+function planMonthly(planFreq, planAmount) {
+  planAmount = Number(planAmount) || 0;
+  return planFreq === "weekly" ? planAmount * 4 : planAmount;
 }
 
 /** Tap-to-send email: opens the phone's email app with a reminder pre-filled. */
@@ -223,13 +305,11 @@ async function emailReminder(repId) {
   body += `.\n`;
   const exp = expectations(person);
   if (exp) {
+    const per = exp.period;
     body +=
-      `\nExpected payments\n` +
-      `• This week: ${peso(exp.weekly)} expected — ${peso(exp.weekPaid)} paid` +
-      (exp.weekToGo > 0 ? `, ${peso(exp.weekToGo)} to go` : ` ✓`) +
-      `\n` +
-      `• This month: ${peso(exp.target)} expected — ${peso(exp.monthPaid)} paid` +
-      (exp.monthToGo > 0 ? `, ${peso(exp.monthToGo)} to go` : ` ✓`) +
+      `\nYour ${per.word} payment plan\n` +
+      `• This ${per.label}: ${peso(per.expected)} expected — ${peso(per.paid)} paid` +
+      (per.toGo > 0 ? `, ${peso(per.toGo)} to go` : ` ✓`) +
       `\n`;
   }
   body += `\nThank you!` + EMAIL_SIGN;
@@ -256,8 +336,9 @@ async function smsReminder(repId) {
   }.`;
   const exp = expectations(person);
   if (exp) {
-    body += ` Weekly expected ${peso(exp.weekly)}`;
-    body += exp.weekToGo > 0 ? ` (${peso(exp.weekToGo)} to go).` : ` (met ✓).`;
+    const per = exp.period;
+    body += ` ${per.word === "weekly" ? "Weekly" : "Monthly"} plan ${peso(per.expected)}`;
+    body += per.toGo > 0 ? ` (${peso(per.toGo)} to go).` : ` (met ✓).`;
   }
   body += ` Thank you!`;
   const num = String(person.phone).replace(/[^\d+]/g, "");
@@ -591,6 +672,22 @@ function buildPersons(debtors, allPayments) {
     // First email / phone found across this person's loan records.
     p.email = (p.loans.map((l) => l.email).find((e) => e && e.trim()) || "").trim();
     p.phone = (p.loans.map((l) => l.phone).find((x) => x && x.trim()) || "").trim();
+    // Payment plan: first loan that carries one; fall back to a legacy monthlyTarget.
+    const pl =
+      p.loans.find((l) => Number(l.planAmount) > 0) ||
+      p.loans.find((l) => Number(l.monthlyTarget) > 0);
+    if (pl) {
+      p.planFreq = pl.planFreq === "weekly" ? "weekly" : "monthly";
+      p.planAmount =
+        Number(pl.planAmount) > 0
+          ? Number(pl.planAmount)
+          : p.planFreq === "weekly"
+          ? Math.round(Number(pl.monthlyTarget) / 4)
+          : Number(pl.monthlyTarget);
+    } else {
+      p.planFreq = "monthly";
+      p.planAmount = 0;
+    }
   });
   // Sort: unsettled first, then by name.
   persons.sort((a, b) => {
@@ -655,8 +752,9 @@ function openSignupQR() {
   $("add_manual").addEventListener("click", openAddDebtor);
 }
 
-/** Open the Add-debtor modal: Name, Amount, Due date, Note, + optional rule/target. */
+/** Open the Add-debtor modal: Name, Amount, Due date, Note + a weekly/monthly payment plan. */
 function openAddDebtor() {
+  let readPlan = () => ({ planFreq: "monthly", planAmount: 0 });
   openModal(
     "Add debtor",
     `
@@ -671,19 +769,13 @@ function openAddDebtor() {
     </div>
     <div class="field"><label>Amount owed (₱)</label>
       <input id="a_debt" type="number" inputmode="decimal" min="0" placeholder="0.00" /></div>
+    ${planFieldsHtml("a_", "monthly", "")}
     <div class="field-row">
       <div class="field"><label>Due date</label>
         <input id="a_due" type="date" /></div>
       <div class="field"><label>Note</label>
         <input id="a_note" placeholder="optional" /></div>
     </div>
-    <details class="more-fields">
-      <summary>More options</summary>
-      <div class="field"><label>Payment rule</label>
-        <input id="a_rule" placeholder="e.g. ₱300 / day" /></div>
-      <div class="field"><label>Expected monthly payment (₱)</label>
-        <input id="a_target" type="number" inputmode="decimal" min="0" placeholder="e.g. 2000" /></div>
-    </details>
   `,
     async () => {
       const name = $("a_name").value.trim();
@@ -696,11 +788,11 @@ function openAddDebtor() {
       const dueVal = $("a_due").value;
       const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
       const note = $("a_note").value.trim();
-      const paymentRule = $("a_rule") ? $("a_rule").value.trim() : "";
-      const monthlyTarget = $("a_target") ? Number($("a_target").value) || 0 : 0;
+      const { planFreq, planAmount } = readPlan();
+      const monthlyTarget = planMonthly(planFreq, planAmount);
 
       const id = await DebtorsDB.add({
-        name, totalDebt, paymentRule, monthlyTarget, dueDate, note, email, phone,
+        name, totalDebt, planFreq, planAmount, monthlyTarget, dueDate, note, email, phone,
       });
       closeModal();
       toast("Debtor added.");
@@ -708,6 +800,7 @@ function openAddDebtor() {
     }
   );
   $("modalSave").textContent = "+ Add debtor";
+  readPlan = wirePlanFields("a_", "a_debt");
   setTimeout(() => $("a_name") && $("a_name").focus(), 60);
 }
 
@@ -878,6 +971,10 @@ async function loadDebtors(animateCards = false) {
     const settled = p.remaining <= 0;
     const rules = p.loans.map((l) => l.paymentRule).filter(Boolean);
     const ruleText = rules.length ? rules.join(" · ") : "";
+    const planChip =
+      p.planAmount > 0
+        ? peso(p.planAmount) + "/" + (p.planFreq === "weekly" ? "wk" : "mo")
+        : "";
     const overdue = !settled && p.dueDate && new Date(p.dueDate) < todayStart;
     const progress = Math.round(pct(p.paid, p.totalDebt));
     const loanCount =
@@ -891,6 +988,7 @@ async function loadDebtors(animateCards = false) {
           overdue ? "Overdue · " : "Due "
         }${fmtDate(p.dueDate)}</span>`
       );
+    if (!settled && planChip) meta.push(`<span class="dcard-rule">🗓️ ${esc(planChip)}</span>`);
     if (!settled && ruleText) meta.push(`<span class="dcard-rule">${esc(ruleText)}</span>`);
 
     const card = document.createElement("div");
@@ -988,7 +1086,9 @@ async function showDetail(repId) {
     .map((l) => {
       const bits = [];
       if (l.paymentRule) bits.push(esc(l.paymentRule));
-      if (Number(l.monthlyTarget) > 0)
+      if (Number(l.planAmount) > 0)
+        bits.push(peso(l.planAmount) + "/" + (l.planFreq === "weekly" ? "wk" : "mo"));
+      else if (Number(l.monthlyTarget) > 0)
         bits.push("target " + peso(l.monthlyTarget) + "/mo");
       return `
         <div class="loan">
@@ -1074,8 +1174,15 @@ async function showDetail(repId) {
       .join("");
   }
 
+  const planBasis = person.remaining > 0 ? person.remaining : person.totalDebt;
   const targetLine =
-    target > 0
+    person.planAmount > 0
+      ? `<p class="rule">🗓️ Plan: <b>${planSummary(
+          planBasis,
+          person.planFreq,
+          person.planAmount
+        )}</b> <span class="muted">· basis for reminders</span></p>`
+      : target > 0
       ? `<p class="rule">🎯 Expected monthly payment: <b>${peso(target)}</b></p>`
       : "";
 
@@ -1168,6 +1275,10 @@ async function editDebtor(id) {
   const d = await DebtorsDB.get(id);
   if (!d) return;
 
+  const initFreq = d.planFreq === "weekly" ? "weekly" : "monthly";
+  const initAmt = Number(d.planAmount) > 0 ? d.planAmount : d.monthlyTarget || "";
+  let readPlan = () => ({ planFreq: initFreq, planAmount: Number(initAmt) || 0 });
+
   openModal(
     "Edit Debt Entry",
     `
@@ -1181,25 +1292,20 @@ async function editDebtor(id) {
     </div>
     <div class="field"><label>Total Debt (₱)</label>
       <input id="m_debt" type="number" min="0" value="${esc(d.totalDebt)}" /></div>
+    ${planFieldsHtml("m_", initFreq, initAmt)}
     <div class="field-row">
       <div class="field"><label>Due date</label>
         <input id="m_due" type="date" value="${d.dueDate ? isoDay(d.dueDate) : ""}" /></div>
       <div class="field"><label>Note</label>
         <input id="m_note" value="${esc(d.note || "")}" placeholder="optional" /></div>
     </div>
-    <div class="field"><label>Payment Rule</label>
-      <input id="m_rule" value="${esc(d.paymentRule || "")}" /></div>
-    <div class="field"><label>Expected Monthly Payment (₱)</label>
-      <input id="m_target" type="number" min="0" value="${esc(
-        d.monthlyTarget || ""
-      )}" /></div>
     <p class="rec-small muted">Tip: same name = grouped with this person.</p>
   `,
     async () => {
       const name = $("m_name").value.trim();
       const totalDebt = Number($("m_debt").value);
-      const paymentRule = $("m_rule").value.trim();
-      const monthlyTarget = Number($("m_target").value) || 0;
+      const { planFreq, planAmount } = readPlan();
+      const monthlyTarget = planMonthly(planFreq, planAmount);
       const dueVal = $("m_due").value;
       const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
       const note = $("m_note").value.trim();
@@ -1208,48 +1314,48 @@ async function editDebtor(id) {
       if (!name) return toast("Name is required.");
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      await DebtorsDB.put({ ...d, name, totalDebt, paymentRule, monthlyTarget, dueDate, note, email, phone });
+      await DebtorsDB.put({ ...d, name, totalDebt, planFreq, planAmount, monthlyTarget, dueDate, note, email, phone });
       closeModal();
       toast("Updated.");
       currentDetailKey = normName(name); // follow a possible rename
       refreshCurrentView();
     }
   );
+  readPlan = wirePlanFields("m_", "m_debt");
 }
 
 /** Add another debt entry under an existing person (same name). */
 function addLoan(name) {
+  let readPlan = () => ({ planFreq: "monthly", planAmount: 0 });
   openModal(
     "Add debt for " + name,
     `
     <div class="field"><label>Total Debt (₱)</label>
       <input id="m_debt" type="number" min="0" placeholder="0.00" /></div>
+    ${planFieldsHtml("m_", "monthly", "")}
     <div class="field-row">
       <div class="field"><label>Due date</label>
         <input id="m_due" type="date" /></div>
       <div class="field"><label>Note</label>
         <input id="m_note" placeholder="optional" /></div>
     </div>
-    <div class="field"><label>Payment Rule</label>
-      <input id="m_rule" placeholder="e.g. ₱300 / day" /></div>
-    <div class="field"><label>Expected Monthly Payment (₱)</label>
-      <input id="m_target" type="number" min="0" placeholder="e.g. 2000" /></div>
   `,
     async () => {
       const totalDebt = Number($("m_debt").value);
-      const paymentRule = $("m_rule").value.trim();
-      const monthlyTarget = Number($("m_target").value) || 0;
+      const { planFreq, planAmount } = readPlan();
+      const monthlyTarget = planMonthly(planFreq, planAmount);
       const dueVal = $("m_due").value;
       const dueDate = dueVal ? new Date(dueVal + "T00:00:00").toISOString() : "";
       const note = $("m_note").value.trim();
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
-      await DebtorsDB.add({ name, totalDebt, paymentRule, monthlyTarget, dueDate, note });
+      await DebtorsDB.add({ name, totalDebt, planFreq, planAmount, monthlyTarget, dueDate, note });
       closeModal();
       toast("Debt entry added.");
       refreshCurrentView();
     }
   );
+  readPlan = wirePlanFields("m_", "m_debt");
 }
 
 async function editPayment(id) {
@@ -1785,7 +1891,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.21";
+const APP_VERSION = "3.22";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
