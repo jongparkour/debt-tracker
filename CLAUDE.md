@@ -51,31 +51,36 @@ Do NOT use `Set-Content` / `Out-File` for these files — they have corrupted �
 - **App usage** = pageviews of `/`. **APK downloads** = pageviews of `/get-app.html` (Cloudflare's free tier has no click events, so `get-app.html` is a landing page that auto-starts the download; the download button + Settings QR + README all funnel through it).
 - View stats at Cloudflare dashboard → Web Analytics → hostname `iridescent-mooncake-68869c.netlify.app`.
 
-## Reminders — free tier + Pro (deferred)
-**Free (live):** debtors have **email** + **phone** fields; tap **✉️/💬** on a debtor to send a reminder via `mailto:`/`sms:` (pre-filled). Recording a payment shows a **receipt** modal (today/week/month/overall + remaining) with tap-to-send Email/Text. All on-device, free, private.
+## Payment plans (v3.22+) — the basis of all reminders
+Each debtor has a **plan**, set in Add/Edit: an **expected monthly payment** (`monthlyTarget`,
+also stored as `planAmount`) + a reminder cadence `planFreq` = `"weekly"` | `"monthly"`. **There
+is NO due date field anymore — the plan cadence IS the schedule.** Helpers in `app.js`:
+`planFieldsHtml`/`wirePlanFields` (monthly amount + Weekly/Monthly toggle + live `planSummary`),
+`weeklyFromMonthly` (÷4 in-app estimate), `expectations()` (period-aware: weekly = monthly/4).
+`buildPersons` carries `planFreq`/`planAmount` (monthly); legacy debtors → monthly with their old
+`monthlyTarget`. Cards/detail show `≈₱600/wk` or `₱2,400/mo`.
 
-**Pro (built but NOT wired yet — waiting for demand):**
-- Settings → Auto reminders shows an **"⚡ Upgrade to Pro"** button (no setup fields). Tapping it opens `pro-request.html` (a Cloudflare-beacon page) → **pageviews of `/pro-request.html` = number of Pro requests**. A local `dt_proRequested` flag stops repeat taps. **When it reaches ~10, build the central automation.**
-- Automation code: `reminders/AutoReminders.gs` — a **sheet-based** Apps Script that reads the
-  Google Form response sheet and sends **Gmail + optional SMS** reminders (before/on/after due
-  date, AM/PM triggers, branded HTML email). **SMS** goes through a phone gateway (**textbee.dev**
-  by default — config `TEXTBEE_API_KEY`/`TEXTBEE_DEVICE_ID`; blank = email only) so texts send
-  from the user's own SIM. Reminders use the sheet's **Total Debt** (sign-up amount), not live
-  in-app remaining balance. Guide: `reminders/SETUP.md`.
-- No free SMS (carriers charge the sender).
+## Reminders — plan-based, automatic (wired, live)
+**In-app tap-to-send (free, offline):** tap **✉️/💬** on a debtor → `mailto:`/`sms:` reminder that
+emphasises the chosen plan period. Recording a payment shows a **receipt** modal.
 
-**Instant payment-confirmation email (wired, live-ready):**
-- Recording a payment calls `syncDebtorById(debtorId, amt)` → `postSync("payment_added", …)`
-  → POSTs `{name,email,total,paid,remaining,amount,dueDate}` (no-cors) to `PAYMENT_SYNC_URL`.
-  Offline attempts queue in `dt_syncQueue` and flush on next boot (`flushSyncQueue`).
-- Config constants at top of `app.js`: `PAYMENT_SYNC_URL` (blank = off → in-app tap-to-send
-  receipt used instead) + `PAYMENT_SYNC_SECRET` (currently `dt-pay-9oytk60`). `getSyncConfig()`
-  returns these constants (no Settings UI, no localStorage).
-- Endpoint = `reminders/AutoReminders.gs` `doPost` → `sendPaymentConfirm_` (checks `SECRET`
-  matches, then `MailApp.sendEmail` a branded receipt with the remaining balance). Deploy the
-  script as a **Web app** (Execute as Me, Anyone), paste the `/exec` URL into `PAYMENT_SYNC_URL`,
-  rebuild + redeploy. `debtor_upsert` POSTs were removed (debtor data flows via the form/sheet);
-  only `payment_added` fires now. Guide: `reminders/SETUP.md` §5.
+**Server-side automatic (Gmail via Apps Script Web App):**
+- The app **syncs each debtor's plan + live balance** to `PAYMENT_SYNC_URL`. `syncDebtorById(id[,amt])`
+  → `postSync("debtor_upsert" | "payment_added", {key,name,email,total,paid,remaining,planFreq,monthly[,amount]})`
+  (no-cors; offline queue `dt_syncQueue` flushes on boot). Called on add / edit / addLoan / payment.
+- Config at top of `app.js`: `PAYMENT_SYNC_URL` (blank = off → tap-to-send only) + `PAYMENT_SYNC_SECRET`
+  (`dt-pay-9oytk60`). `getSyncConfig()` returns these constants.
+- Engine = `reminders/AutoReminders.gs` (rewritten v3.22): `doPost` upserts a **"Reminders"** tab
+  (Email|Name|Freq|Monthly|Remaining|Enrolled|Active|LastWeekly|LastMonthly) and updates balance on
+  payments; `sendPlanReminders()` runs daily (trigger via `createTriggers`) →
+  **weekly plans email every Saturday** (amount = monthly ÷ that month's weekends, `weeklyAmount_`,
+  mid-month = only remaining weekends), **monthly plans email on the 1st**. Amounts capped at
+  remaining; stops when settled. `sendPaymentConfirm_` still sends the instant receipt + "fully
+  paid ✓" email. SMS dropped from the engine (email-only). Guide: `reminders/SETUP.md`.
+- **Redeploy after editing the .gs:** Manage deployments → ✏ → Version: New version (same `/exec` URL).
+
+**Pro request counter (still live):** Settings **"⚡ Upgrade to Pro"** → `pro-request.html`
+(Cloudflare-beacon) counts demand; `dt_proRequested` stops repeat taps.
 
 ## Sign-up auto-import (debtors self-register)
 Debtors fill a Google Form → response Sheet **Published to web as CSV** → the app
