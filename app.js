@@ -1852,8 +1852,27 @@ $("modalCancel").addEventListener("click", closeModal);
 $("modalSave").addEventListener("click", () => {
   if (modalSaveHandler) modalSaveHandler();
 });
+/** True if the open modal has a saveable form with anything typed in. */
+function modalHasInput() {
+  const body = $("modalBody");
+  if (!body) return false;
+  return Array.from(body.querySelectorAll("input, textarea")).some((el) => {
+    const t = (el.type || "").toLowerCase();
+    if (t === "button" || t === "submit") return false;
+    return String(el.value || "").trim() !== "";
+  });
+}
+// Tapping the backdrop closes info dialogs freely, but on a half-filled form it confirms first
+// so an accidental tap never wipes what was entered.
 $("modalOverlay").addEventListener("click", (e) => {
-  if (e.target.id === "modalOverlay") closeModal();
+  if (e.target.id !== "modalOverlay") return;
+  if (
+    modalSaveHandler &&
+    modalHasInput() &&
+    !confirm("Discard this entry? Your details will be lost.")
+  )
+    return;
+  closeModal();
 });
 
 // Tap a hidden amount to toggle it: first tap reveals, next tap blurs again.
@@ -1935,7 +1954,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.25";
+const APP_VERSION = "3.26";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
