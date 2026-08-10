@@ -212,24 +212,36 @@ function weeklyAmount_(monthly, enrolled, now, dueDow) {
 
 function sendReminderEmail_(email, name, kind, amt, remaining) {
   var overdue = kind === "overdue";
-  var subject = (overdue ? "Overdue payment — " : "Payment due today — ") + peso_(amt);
+  // Gentle, personal subject/body improve inbox placement (esp. Apple/iCloud). Avoid ALL-CAPS,
+  // "OVERDUE", and money-in-subject urgency that spam filters key on.
+  var subject = "A quick payment reminder from " + SENDER_NAME;
   var lead = overdue
-    ? "Your payment of <b>" + peso_(amt) + "</b> was due yesterday and is now overdue."
-    : "Friendly reminder: your payment of <b>" + peso_(amt) + "</b> is due today.";
+    ? "Just following up — your scheduled payment of <b>" + peso_(amt) + "</b> was due yesterday."
+    : "A friendly reminder that your scheduled payment of <b>" + peso_(amt) + "</b> is due today.";
   var inner =
     '<p style="margin:0 0 10px;">Hi ' + escapeHtml_(name) + ',</p>' +
     '<p style="margin:0 0 4px;">' + lead + '</p>' +
-    balBox_((overdue ? "OVERDUE: " : "PLEASE PAY: ") + peso_(amt), false) +
+    balBox_("Amount due: " + peso_(amt), false) +
     '<p style="margin:10px 0 0;color:#475569;font-size:13px;">Remaining balance: <b>' +
     peso_(remaining) + '</b></p>' +
-    '<p style="margin:10px 0 0;">Thank you!</p>';
-  var plain = "Hi " + name + ",\n\nYour payment of " + peso_(amt) +
-    (overdue ? " was due yesterday and is now overdue." : " is due today.") +
-    "\nRemaining balance: " + peso_(remaining) + "\n\nThank you!";
-  MailApp.sendEmail({
+    '<p style="margin:12px 0 0;">Thanks so much,<br>' + escapeHtml_(SENDER_NAME) + '</p>' +
+    '<p style="margin:14px 0 0;color:#94a3b8;font-size:12px;">You’re getting this because you have a ' +
+    'payment arrangement with ' + escapeHtml_(SENDER_NAME) + '. Just reply to this email with any questions.</p>';
+  var plain = "Hi " + name + ",\n\n" +
+    (overdue
+      ? "Just following up — your scheduled payment of " + peso_(amt) + " was due yesterday."
+      : "A friendly reminder that your scheduled payment of " + peso_(amt) + " is due today.") +
+    "\nRemaining balance: " + peso_(remaining) +
+    "\n\nThanks so much,\n" + SENDER_NAME +
+    "\n\nYou're getting this because you have a payment arrangement with " + SENDER_NAME +
+    ". Just reply with any questions.";
+  var opts = {
     to: email, subject: subject, name: SENDER_NAME,
-    htmlBody: htmlEmail_(overdue ? "Overdue payment" : "Payment reminder", inner), body: plain,
-  });
+    htmlBody: htmlEmail_("Payment reminder", inner), body: plain,
+  };
+  var rt = senderEmail_();
+  if (rt) opts.replyTo = rt;
+  MailApp.sendEmail(opts);
 }
 
 /* Payment receipt (instant) — also the "fully paid" email when settled. */
@@ -252,10 +264,13 @@ function sendPaymentConfirm_(d) {
   var plain = "Hi " + name + ",\n\n" + lead + "\n\n" +
     (settled ? "Fully paid — thank you!" : "Remaining balance: " + peso_(remaining)) +
     "\n\nThank you!";
-  MailApp.sendEmail({
+  var opts = {
     to: email, subject: subject, name: SENDER_NAME,
     htmlBody: htmlEmail_("Payment receipt", inner), body: plain,
-  });
+  };
+  var rt = senderEmail_();
+  if (rt) opts.replyTo = rt;
+  MailApp.sendEmail(opts);
 }
 
 /* Triggers + test. */
@@ -275,6 +290,7 @@ function sendTest() {
 }
 
 /* ---------------- helpers ---------------- */
+function senderEmail_() { try { return Session.getActiveUser().getEmail() || ""; } catch (e) { return ""; } }
 function normEmail_(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
 function num_(n) { var x = Number(String(n == null ? "" : n).replace(/[^0-9.\-]/g, "")); return isNaN(x) ? 0 : x; }
 function peso_(n) { return CURRENCY + num_(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
