@@ -483,6 +483,15 @@
         <button type="button" class="btn" id="s_feedbackBtn" style="width:100%;">✉️ Send feedback</button>
       </section>
 
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <div class="settings-card-icon">ℹ️</div>
+          <div class="settings-card-title"><h2>About</h2>
+            <p>What this app is and how it keeps your data.</p></div>
+        </div>
+        <button type="button" class="btn" id="s_aboutBtn" style="width:100%;">ℹ️ About Debt Tracker</button>
+      </section>
+
       <section class="settings-card danger-card">
         <button type="button" class="btn danger-btn" id="s_lockBtn" style="width:100%;">🔒 Lock app now</button>
       </section>
@@ -736,6 +745,32 @@
     $("s_lockBtn").addEventListener("click", () => {
       previewTheme(window.getTheme ? getTheme() : "light"); // drop any unsaved theme preview
       lockNow();
+    });
+
+    // ----- About (description in a simple modal) -----
+    $("s_aboutBtn").addEventListener("click", () => {
+      const ver = window.APP_VERSION || "";
+      if (!window.openModal) return;
+      openModal(
+        "About Debt Tracker",
+        `
+        <p class="modal-intro" style="margin:0 0 12px;">A simple, private tracker for money people
+          owe you — with weekly/monthly payment plans and automatic email reminders.</p>
+        <ul class="about-list">
+          <li><b>Track debts &amp; payments</b> — see who owes what, and the remaining balance at a glance.</li>
+          <li><b>Payment plans</b> — set a weekly or monthly plan with a due day; reminders follow it.</li>
+          <li><b>Automatic reminders</b> — debtors get emailed on their due day (and a receipt on payment).</li>
+          <li><b>Self sign-up</b> — share a link/QR so debtors add themselves.</li>
+        </ul>
+        <p class="pin-help" style="margin-top:12px;">🔒 <b>Your data stays on this device</b>
+          (offline storage). Only reminder emails you trigger leave the app. The lock protects access;
+          use CSV export to back up.</p>
+        <p class="pin-help" style="margin-top:8px;color:var(--muted);">Version ${ver}</p>
+      `,
+        null
+      );
+      $("modalSave").style.display = "none";
+      $("modalCancel").textContent = "Close";
     });
 
     // ----- Sticky Save / Discard bar (static elements → assign, don't stack) -----

@@ -630,6 +630,8 @@ input:focus, textarea:focus, select:focus {
 
 /* ---------- Modal helpers (add/edit forms) ---------- */
 .modal-intro { margin: 0 0 14px; font-size: 0.85rem; }
+.about-list { margin: 0; padding-left: 18px; font-size: 0.9rem; line-height: 1.5; color: var(--ink); }
+.about-list li { margin: 5px 0; }
 .field-row { display: flex; gap: 12px; }
 .field-row .field { flex: 1 1 0; min-width: 0; }
 .more-fields { margin-top: 2px; }
