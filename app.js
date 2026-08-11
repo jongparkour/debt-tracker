@@ -800,6 +800,19 @@ function openSignupQR() {
   $("add_manual").addEventListener("click", openAddDebtor);
 }
 
+/** Name of another debtor already using this email (reminders are matched by email, so a shared
+ *  email would conflict on the server). Returns null if it's free or belongs to `exceptKey`. */
+async function emailOwner(email, exceptKey) {
+  email = String(email || "").trim().toLowerCase();
+  if (!email) return null;
+  const debtors = await DebtorsDB.getAll();
+  for (const d of debtors) {
+    if (String(d.email || "").trim().toLowerCase() !== email) continue;
+    if (normName(d.name) !== exceptKey) return d.name;
+  }
+  return null;
+}
+
 /** Open the Add-debtor modal: Name, Amount, Due date, Note + a weekly/monthly payment plan. */
 function openAddDebtor() {
   let readPlan = () => ({ planFreq: "monthly", planAmount: 0, planDay: 1 });
@@ -832,6 +845,11 @@ function openAddDebtor() {
       const note = $("a_note").value.trim();
       const { planFreq, planAmount, planDay } = readPlan();
       const monthlyTarget = planMonthly(planFreq, planAmount);
+
+      const dupe = await emailOwner(email, normName(name));
+      if (dupe && !confirm(
+        `"${dupe}" already uses ${email}. Reminders are matched by email, so they may conflict. Add anyway?`
+      )) return;
 
       const id = await DebtorsDB.add({
         name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note, email, phone,
@@ -1361,6 +1379,11 @@ async function editDebtor(id) {
       const phone = $("m_phone").value.trim();
       if (!name) return toast("Name is required.");
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
+
+      const dupe = await emailOwner(email, normName(name));
+      if (dupe && !confirm(
+        `"${dupe}" already uses ${email}. Reminders are matched by email, so they may conflict. Save anyway?`
+      )) return;
 
       await DebtorsDB.put({ ...d, name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note, email, phone });
       closeModal();
@@ -1954,7 +1977,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.26";
+const APP_VERSION = "3.27";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
