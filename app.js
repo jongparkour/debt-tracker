@@ -632,8 +632,13 @@ async function pullSignups(silent) {
 
   const existing = await DebtorsDB.getAll();
   const have = new Set(existing.map((d) => normName(d.name)));
+  // Enforce one email per debtor: skip sign-ups whose email is already taken.
+  const usedEmails = new Set(
+    existing.map((d) => String(d.email || "").trim().toLowerCase()).filter(Boolean)
+  );
 
-  let added = 0;
+  let added = 0,
+    skipped = 0;
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (iCode != null) {
@@ -647,6 +652,13 @@ async function pullSignups(silent) {
     const totalDebt = parseNum(row[iDebt]);
     if (!(totalDebt > 0)) continue;
 
+    const email = iEmail != null ? String(row[iEmail] || "").trim() : "";
+    const emailKey = email.toLowerCase();
+    if (emailKey && usedEmails.has(emailKey)) {
+      skipped++; // that email already belongs to another debtor
+      continue;
+    }
+
     await DebtorsDB.add({
       name,
       totalDebt,
@@ -654,17 +666,23 @@ async function pullSignups(silent) {
       paymentRule: iRule != null ? String(row[iRule] || "").trim() : "",
       dueDate: iDue != null ? parseDateISO(row[iDue]) || "" : "",
       note: iNote != null ? String(row[iNote] || "").trim() : "",
-      email: iEmail != null ? String(row[iEmail] || "").trim() : "",
+      email,
       phone: iPhone != null ? String(row[iPhone] || "").trim() : "",
     });
     have.add(key);
+    if (emailKey) usedEmails.add(emailKey);
     added++;
   }
 
   if (added > 0) {
     if (currentDetailKey == null) loadDebtors();
     else refreshCurrentView();
-    toast(`Imported ${added} new sign-up${added !== 1 ? "s" : ""}.`);
+    toast(
+      `Imported ${added} new sign-up${added !== 1 ? "s" : ""}.` +
+        (skipped ? ` Skipped ${skipped} with a duplicate email.` : "")
+    );
+  } else if (skipped && !silent) {
+    toast(`Skipped ${skipped} sign-up${skipped !== 1 ? "s" : ""} with a duplicate email.`);
   } else if (!silent) {
     toast("No new sign-ups.");
   }
@@ -847,9 +865,10 @@ function openAddDebtor() {
       const monthlyTarget = planMonthly(planFreq, planAmount);
 
       const dupe = await emailOwner(email, normName(name));
-      if (dupe && !confirm(
-        `"${dupe}" already uses ${email}. Reminders are matched by email, so they may conflict. Add anyway?`
-      )) return;
+      if (dupe) {
+        $("a_email").focus();
+        return toast(`That email is already used by "${dupe}". Each debtor needs a unique email.`);
+      }
 
       const id = await DebtorsDB.add({
         name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note, email, phone,
@@ -1381,9 +1400,10 @@ async function editDebtor(id) {
       if (!(totalDebt > 0)) return toast("Enter a valid total debt.");
 
       const dupe = await emailOwner(email, normName(name));
-      if (dupe && !confirm(
-        `"${dupe}" already uses ${email}. Reminders are matched by email, so they may conflict. Save anyway?`
-      )) return;
+      if (dupe) {
+        $("m_email").focus();
+        return toast(`That email is already used by "${dupe}". Each debtor needs a unique email.`);
+      }
 
       await DebtorsDB.put({ ...d, name, totalDebt, planFreq, planAmount, planDay, monthlyTarget, note, email, phone });
       closeModal();
@@ -1977,7 +1997,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.27";
+const APP_VERSION = "3.28";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
