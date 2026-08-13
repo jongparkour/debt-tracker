@@ -94,13 +94,18 @@ function readBackup_() {
  *  1 Email | 2 Name | 3 Freq | 4 Monthly | 5 DueDay | 6 Remaining |
  *  7 Enrolled | 8 Active | 9 LastPaid | 10 LastSent
  * ------------------------------------------------------------------ */
+var REM_HEADER = ["Email", "Name", "Freq", "Monthly", "DueDay", "Remaining", "Enrolled", "Active", "LastPaid", "LastSent", "CC"];
 function remindersSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
-  if (!sh) {
-    sh = ss.insertSheet(SHEET_NAME);
-    sh.appendRow(["Email", "Name", "Freq", "Monthly", "DueDay", "Remaining", "Enrolled", "Active", "LastPaid", "LastSent", "CC"]);
+  if (!sh) sh = ss.insertSheet(SHEET_NAME);
+  // Keep the header row correct even after a schema change (fixes mislabeled columns).
+  var cur = sh.getRange(1, 1, 1, REM_HEADER.length).getValues()[0];
+  var ok = true;
+  for (var i = 0; i < REM_HEADER.length; i++) {
+    if (String(cur[i] || "") !== REM_HEADER[i]) { ok = false; break; }
   }
+  if (!ok) sh.getRange(1, 1, 1, REM_HEADER.length).setValues([REM_HEADER]);
   return sh;
 }
 function findRowByEmail_(sh, email) {
