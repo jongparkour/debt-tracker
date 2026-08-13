@@ -597,6 +597,7 @@ async function syncDebtorById(repId, paymentAmount) {
       planFreq: person.planFreq === "weekly" ? "weekly" : "monthly",
       monthly: Number(person.planAmount) || Number(person.monthlyTarget) || 0,
       planDay: person.planDay != null ? Number(person.planDay) : person.planFreq === "weekly" ? 6 : 1,
+      cc: getLenderEmail(), // this user gets copied on their debtors' emails
     };
     if (paymentAmount)
       postSync("payment_added", { ...base, amount: Number(paymentAmount) });
@@ -634,6 +635,67 @@ function ensureLenderCode() {
   if (!getLenderCode()) setLenderCode("d" + Math.random().toString(36).slice(2, 8));
   return getLenderCode();
 }
+
+/** This user's own email — CC'd on every reminder/receipt sent to their debtors. */
+function getLenderEmail() {
+  try {
+    return (localStorage.getItem("dt_lenderEmail") || "").trim();
+  } catch (e) {
+    return "";
+  }
+}
+function setLenderEmail(v) {
+  try {
+    localStorage.setItem("dt_lenderEmail", (v || "").trim());
+  } catch (e) {}
+}
+/** Re-push every debtor to the backend so a newly-set CC email lands on all their rows. */
+async function resyncAllDebtors() {
+  try {
+    const [debtors, pays] = await Promise.all([DebtorsDB.getAll(), PaymentsDB.getAll()]);
+    const persons = buildPersons(debtors, pays);
+    for (const p of persons) syncDebtorById(p.payToId);
+  } catch (e) {}
+}
+/** One-time prompt (after unlock) asking the user for their copy-me email. */
+function maybePromptLenderEmail() {
+  if (!getSyncConfig().url) return; // reminders/CC only matter when the backend is wired
+  if (getLenderEmail()) return;
+  let asked = "";
+  try {
+    asked = localStorage.getItem("dt_lenderEmailAsked") || "";
+  } catch (e) {}
+  if (asked) return;
+  try {
+    localStorage.setItem("dt_lenderEmailAsked", "1");
+  } catch (e) {}
+  openModal(
+    "Get copied on reminders",
+    `
+    <p class="modal-intro">Enter your email to be <b>CC'd</b> on every reminder and receipt sent to
+      your debtors — so you always have a copy. Use a business or a dedicated notifications email
+      (not your personal one) for the cleanest inbox.</p>
+    <div class="field"><label>Your email</label>
+      <input id="le_email" type="email" inputmode="email" placeholder="you@business.com" /></div>
+  `,
+    async () => {
+      const v = $("le_email").value.trim();
+      if (v && !/^\S+@\S+\.\S+$/.test(v)) return toast("Enter a valid email.");
+      setLenderEmail(v);
+      closeModal();
+      if (v) {
+        toast("You'll be CC'd on your debtors' reminders.");
+        resyncAllDebtors();
+      }
+    }
+  );
+  $("modalSave").textContent = "Save";
+  $("modalCancel").textContent = "Not now";
+}
+window.maybePromptLenderEmail = maybePromptLenderEmail;
+window.getLenderEmail = getLenderEmail;
+window.setLenderEmail = setLenderEmail;
+window.resyncAllDebtors = resyncAllDebtors;
 /** The link to give debtors: personalized (with this device's tag) if a pre-fill base is
  *  configured, otherwise the plain form link. */
 function signupShareLink() {
@@ -2143,7 +2205,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.36";
+const APP_VERSION = "3.37";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

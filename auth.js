@@ -345,6 +345,8 @@
     });
     // Always reveal the dashboard after unlocking — never a stale Settings/detail view.
     if (window.showList) showList();
+    // One-time nudge to set the "copy me on reminders" email.
+    if (window.maybePromptLenderEmail) setTimeout(() => maybePromptLenderEmail(), 500);
   }
 
   async function showUnlock() {
@@ -481,6 +483,19 @@
           <p class="field-error hidden" id="s_fbErr">Please type your feedback first.</p>
         </div>
         <button type="button" class="btn" id="s_feedbackBtn" style="width:100%;">✉️ Send feedback</button>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <div class="settings-card-icon">📩</div>
+          <div class="settings-card-title"><h2>Copy me on reminders</h2>
+            <p>Get CC'd on every reminder &amp; receipt sent to your debtors. Use a business or
+               notifications email, not your personal one.</p></div>
+        </div>
+        <div class="field">
+          <input id="s_lenderEmail" type="email" inputmode="email" placeholder="you@business.com" />
+        </div>
+        <button type="button" class="btn" id="s_lenderEmailBtn" style="width:100%;">Save my email</button>
       </section>
 
       <section class="settings-card">
@@ -757,6 +772,17 @@
     $("s_lockBtn").addEventListener("click", () => {
       previewTheme(window.getTheme ? getTheme() : "light"); // drop any unsaved theme preview
       lockNow();
+    });
+
+    // ----- Copy me on reminders (lender CC email) -----
+    const leEmail = $("s_lenderEmail");
+    if (leEmail && window.getLenderEmail) leEmail.value = getLenderEmail();
+    $("s_lenderEmailBtn").addEventListener("click", () => {
+      const v = (leEmail.value || "").trim();
+      if (v && !/^\S+@\S+\.\S+$/.test(v)) return window.toast && toast("Enter a valid email.");
+      if (window.setLenderEmail) setLenderEmail(v);
+      if (window.resyncAllDebtors) resyncAllDebtors();
+      if (window.toast) toast(v ? "Saved. You'll be CC'd on reminders." : "Cleared.");
     });
 
     // ----- Backup & recovery -----

@@ -30,6 +30,7 @@ var CURRENCY = "₱";
 var SECRET = "dt-pay-9oytk60";   // MUST match PAYMENT_SYNC_SECRET in the app (app.js)
 var RUN_HOURS = [8, 14];         // send reminders at 8 AM and 2 PM (twice on the due day)
 var SHEET_NAME = "Reminders";    // tracking tab (auto-created)
+var OWNER_NOTIFY = "";           // your email to BCC on EVERY reminder/receipt (blank = off)
 // =================================================
 
 /* Web App endpoint. GET ?action=backup&token=… returns the latest full backup (for Restore). */
@@ -98,7 +99,7 @@ function remindersSheet_() {
   var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(SHEET_NAME);
-    sh.appendRow(["Email", "Name", "Freq", "Monthly", "DueDay", "Remaining", "Enrolled", "Active", "LastPaid", "LastSent"]);
+    sh.appendRow(["Email", "Name", "Freq", "Monthly", "DueDay", "Remaining", "Enrolled", "Active", "LastPaid", "LastSent", "CC"]);
   }
   return sh;
 }
@@ -126,8 +127,9 @@ function upsertDebtor_(d) {
     sh.getRange(row, 5).setValue(num_(d.planDay));
     sh.getRange(row, 6).setValue(remaining);
     sh.getRange(row, 8).setValue(active);
+    sh.getRange(row, 11).setValue(normEmail_(d.cc));
   } else {
-    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, "", ""]);
+    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, "", "", normEmail_(d.cc)]);
   }
 }
 function applyPayment_(d) {
@@ -141,9 +143,10 @@ function applyPayment_(d) {
     sh.getRange(row, 6).setValue(remaining);
     sh.getRange(row, 8).setValue(active);
     sh.getRange(row, 9).setValue(todayStr_()); // LastPaid
+    if (d.cc) sh.getRange(row, 11).setValue(normEmail_(d.cc));
   } else {
     var freq = d.planFreq === "weekly" ? "weekly" : "monthly";
-    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, todayStr_(), ""]);
+    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, todayStr_(), "", normEmail_(d.cc)]);
   }
 }
 
@@ -154,7 +157,7 @@ function sendReminders() {
   var sh = remindersSheet_();
   var last = sh.getLastRow();
   if (last < 2) return;
-  var data = sh.getRange(2, 1, last - 1, 10).getValues();
+  var data = sh.getRange(2, 1, last - 1, 11).getValues();
   var tz = Session.getScriptTimeZone();
   var now = new Date();
   var slot = now.getHours() < 12 ? "AM" : "PM";
@@ -174,6 +177,7 @@ function sendReminders() {
     var active = String(data[i][7] || "").toLowerCase();
     var lastPaid = ymd_(data[i][8]);
     var lastSent = String(data[i][9] || "");
+    var cc = normEmail_(data[i][10]);
     if (active !== "yes" || remaining <= 0 || monthly <= 0) continue;
     if (lastSent === stamp) continue; // already sent this slot
 
@@ -182,7 +186,7 @@ function sendReminders() {
 
     var amt = Math.min(decision.amount, remaining);
     if (amt <= 0) continue;
-    sendReminderEmail_(email, name, decision.kind, amt, remaining);
+    sendReminderEmail_(email, name, decision.kind, amt, remaining, cc);
     sh.getRange(row, 10).setValue(stamp);
     sent++;
   }
@@ -241,7 +245,7 @@ function weeklyAmount_(monthly, enrolled, now, dueDow) {
   return Math.round(monthly / n);
 }
 
-function sendReminderEmail_(email, name, kind, amt, remaining) {
+function sendReminderEmail_(email, name, kind, amt, remaining, cc) {
   var overdue = kind === "overdue";
   // Gentle, personal subject/body improve inbox placement (esp. Apple/iCloud). Avoid ALL-CAPS,
   // "OVERDUE", and money-in-subject urgency that spam filters key on.
@@ -272,6 +276,7 @@ function sendReminderEmail_(email, name, kind, amt, remaining) {
   };
   var rt = senderEmail_();
   if (rt) opts.replyTo = rt;
+  applyCopies_(opts, cc);
   MailApp.sendEmail(opts);
 }
 
@@ -301,7 +306,16 @@ function sendPaymentConfirm_(d) {
   };
   var rt = senderEmail_();
   if (rt) opts.replyTo = rt;
+  applyCopies_(opts, d.cc);
   MailApp.sendEmail(opts);
+}
+
+/** Add the lender's CC copy + the owner's BCC notification to an email's options. */
+function applyCopies_(opts, cc) {
+  cc = normEmail_(cc);
+  if (cc && cc !== normEmail_(opts.to)) opts.cc = cc;
+  var owner = normEmail_(OWNER_NOTIFY);
+  if (owner) opts.bcc = owner;
 }
 
 /* Triggers + test. */
