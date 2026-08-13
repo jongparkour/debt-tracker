@@ -2061,7 +2061,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.34";
+const APP_VERSION = "3.35";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
@@ -2097,8 +2097,25 @@ function updateApkPromo() {
   if (promo) promo.classList.toggle("hidden", isInstalledApp());
 }
 
+/* Ask the browser to KEEP our data. Without this, mobile browsers can evict the app's
+   IndexedDB under storage pressure — which wipes every debtor and payment. */
+async function requestPersistentStorage() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      const already = await navigator.storage.persisted();
+      if (!already) {
+        const ok = await navigator.storage.persist();
+        console.log("[Debt Tracker] persistent storage:", ok ? "granted" : "not granted");
+      }
+    }
+  } catch (e) {
+    /* not supported — ignore */
+  }
+}
+
 /* -------------------- Boot -------------------- */
 
+requestPersistentStorage(); // protect data from browser eviction (must run early)
 applyTheme(getTheme());
 updateOnlineStatus();
 updateApkPromo();
