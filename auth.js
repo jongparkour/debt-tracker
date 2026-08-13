@@ -485,6 +485,15 @@
 
       <section class="settings-card">
         <div class="settings-card-head">
+          <div class="settings-card-icon">🛟</div>
+          <div class="settings-card-title"><h2>Recover payments</h2>
+            <p>Find payments that got detached from a debtor and re-link them.</p></div>
+        </div>
+        <button type="button" class="btn" id="s_recoverBtn" style="width:100%;">🛟 Scan for lost payments</button>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
           <div class="settings-card-icon">ℹ️</div>
           <div class="settings-card-title"><h2>About</h2>
             <p>What this app is and how it keeps your data.</p></div>
@@ -745,6 +754,11 @@
     $("s_lockBtn").addEventListener("click", () => {
       previewTheme(window.getTheme ? getTheme() : "light"); // drop any unsaved theme preview
       lockNow();
+    });
+
+    // ----- Recover payments (re-link orphaned payments) -----
+    $("s_recoverBtn").addEventListener("click", () => {
+      if (window.recoverPayments) recoverPayments();
     });
 
     // ----- About (description in a simple modal) -----
