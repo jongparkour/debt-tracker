@@ -1049,8 +1049,11 @@ async function loadDebtors(animateCards = false) {
     const loanCount =
       p.loans.length > 1 ? ` <span class="muted">· ${p.loans.length} debts</span>` : "";
 
-    // Meta chips (plan / rule) — only meaningful while a balance remains.
+    // Meta chips — only meaningful while a balance remains.
     const meta = [];
+    // Legacy due date shown as a record only (the plan drives reminders now).
+    if (!settled && p.dueDate)
+      meta.push(`<span class="dcard-rule">📅 Due ${fmtDate(p.dueDate)}</span>`);
     if (!settled && planChip) meta.push(`<span class="dcard-rule">🗓️ ${esc(planChip)}</span>`);
     if (!settled && ruleText) meta.push(`<span class="dcard-rule">${esc(ruleText)}</span>`);
     // Flag debtors on a plan who can't get automatic reminders (no email on file).
@@ -1257,6 +1260,8 @@ async function showDetail(repId) {
       : "";
 
   const detailMeta = [];
+  // Show a legacy due date as a record only — the plan (weekly/monthly) drives reminders now.
+  if (person.dueDate) detailMeta.push(`📅 Due ${fmtDate(person.dueDate)}`);
   if (person.note) detailMeta.push(`📝 ${esc(person.note)}`);
   const metaLine = detailMeta.length
     ? `<p class="rule">${detailMeta.join(" &nbsp;·&nbsp; ")}</p>`
@@ -1986,7 +1991,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.31";
+const APP_VERSION = "3.32";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
