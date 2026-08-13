@@ -345,11 +345,8 @@ async function emailReminder(repId) {
   if (!person.email) return toast("Add an email for this debtor first (Edit).");
 
   const amt = peso(person.remaining);
-  const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
   const subject = `Payment reminder — ${amt}`;
-  let body = emailBrand("PAYMENT REMINDER") + `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}`;
-  if (dueStr) body += `, due on ${dueStr}`;
-  body += `.\n`;
+  let body = emailBrand("PAYMENT REMINDER") + `Hi ${person.name},\n\nFriendly reminder about your outstanding balance of ${amt}.\n`;
   const exp = expectations(person);
   if (exp) {
     const per = exp.period;
@@ -377,10 +374,7 @@ async function smsReminder(repId) {
   if (!person.phone) return toast("Add a phone number for this debtor first (Edit).");
 
   const amt = peso(person.remaining);
-  const dueStr = person.dueDate ? fmtDate(person.dueDate) : "";
-  let body = `Hi ${person.name}, reminder: ${amt} balance${
-    dueStr ? " due " + dueStr : ""
-  }.`;
+  let body = `Hi ${person.name}, reminder: ${amt} balance.`;
   const exp = expectations(person);
   if (exp) {
     const per = exp.period;
@@ -1044,9 +1038,6 @@ async function loadDebtors(animateCards = false) {
   if ($("listControls"))
     $("listControls").classList.toggle("hidden", persons.length === 0);
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
   visible.forEach((p, i) => {
     const settled = p.remaining <= 0;
     const rules = p.loans.map((l) => l.paymentRule).filter(Boolean);
@@ -1057,21 +1048,17 @@ async function loadDebtors(animateCards = false) {
           ? "≈" + peso(weeklyFromMonthly(p.planAmount)) + "/wk"
           : peso(p.planAmount) + "/mo"
         : "";
-    const overdue = !settled && p.dueDate && new Date(p.dueDate) < todayStart;
     const progress = Math.round(pct(p.paid, p.totalDebt));
     const loanCount =
       p.loans.length > 1 ? ` <span class="muted">· ${p.loans.length} debts</span>` : "";
 
-    // Meta chips (due date / rule) — only meaningful while a balance remains.
+    // Meta chips (plan / rule) — only meaningful while a balance remains.
     const meta = [];
-    if (!settled && p.dueDate)
-      meta.push(
-        `<span class="dcard-due${overdue ? " overdue" : ""}">📅 ${
-          overdue ? "Overdue · " : "Due "
-        }${fmtDate(p.dueDate)}</span>`
-      );
     if (!settled && planChip) meta.push(`<span class="dcard-rule">🗓️ ${esc(planChip)}</span>`);
     if (!settled && ruleText) meta.push(`<span class="dcard-rule">${esc(ruleText)}</span>`);
+    // Flag debtors on a plan who can't get automatic reminders (no email on file).
+    if (!settled && p.planAmount > 0 && !p.email)
+      meta.push(`<span class="dcard-warn">⚠️ No email — reminders off</span>`);
 
     const card = document.createElement("div");
     card.className = "dcard" + (settled ? " is-paid" : "");
@@ -1273,11 +1260,15 @@ async function showDetail(repId) {
       : "";
 
   const detailMeta = [];
-  if (person.dueDate) detailMeta.push(`📅 Due <b>${fmtDate(person.dueDate)}</b>`);
   if (person.note) detailMeta.push(`📝 ${esc(person.note)}`);
   const metaLine = detailMeta.length
     ? `<p class="rule">${detailMeta.join(" &nbsp;·&nbsp; ")}</p>`
     : "";
+  // Warn when this debtor has a plan but no email → automatic reminders can't reach them.
+  const noEmailNote =
+    person.remaining > 0 && person.planAmount > 0 && !person.email
+      ? `<p class="rule warn-note">⚠️ No email on file — automatic reminders are off for this debtor. Add an email in <b>Edit</b>.</p>`
+      : "";
 
   $("detailContent").innerHTML = `
     <div class="card detail-card">
@@ -1297,6 +1288,7 @@ async function showDetail(repId) {
       </div>
       ${metaLine}
       ${targetLine}
+      ${noEmailNote}
       <div class="progress"><span style="width:${pct(
         person.paid,
         person.totalDebt
@@ -1997,7 +1989,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.29";
+const APP_VERSION = "3.30";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

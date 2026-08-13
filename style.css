@@ -587,6 +587,16 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--danger-border);
 }
 .dcard-note { margin: 0 0 12px; font-size: 0.8rem; color: var(--muted); font-style: italic; }
+.dcard-warn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--subtle-bg);
+  border: 1px solid var(--warn);
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.warn-note { color: var(--warn); }
 .dcard-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
 .dcard-actions .btn { flex: 0 0 auto; width: auto; }
 .badge-paid {
