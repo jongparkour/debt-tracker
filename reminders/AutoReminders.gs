@@ -32,9 +32,15 @@ var RUN_HOURS = [8, 14];         // send reminders at 8 AM and 2 PM (twice on th
 var SHEET_NAME = "Reminders";    // tracking tab (auto-created)
 // =================================================
 
-/* Web App endpoint — the app POSTs debtor_upsert + payment_added here. */
-function doGet() {
-  return ContentService.createTextOutput("Debt Tracker reminder endpoint is live.");
+/* Web App endpoint. GET ?action=backup&token=… returns the latest full backup (for Restore). */
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === "backup") {
+    if (String(e.parameter.token || "") !== SECRET) return out_("bad token");
+    return ContentService
+      .createTextOutput(readBackup_())
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return out_("Debt Tracker reminder endpoint is live.");
 }
 function doPost(e) {
   try {
@@ -50,12 +56,37 @@ function doPost(e) {
       upsertDebtor_(d);        // enrol / update the plan
       return out_("ok");
     }
+    if (body.type === "backup") {
+      saveBackup_(d);          // full snapshot of all debtors + payments
+      return out_("ok");
+    }
     return out_("ignored");
   } catch (err) {
     return out_("error: " + err.message);
   }
 }
 function out_(s) { return ContentService.createTextOutput(s); }
+
+/* ---- Full backup (debtors + payments) stored in a "Backup" tab, cell A1 ---- */
+function backupSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName("Backup");
+  if (!sh) {
+    sh = ss.insertSheet("Backup");
+    sh.getRange("A1").setValue("{}");
+    sh.getRange("C1").setValue("← latest app backup (JSON). Do not edit.");
+  }
+  return sh;
+}
+function saveBackup_(data) {
+  var sh = backupSheet_();
+  sh.getRange("A1").setValue(JSON.stringify(data)); // cell holds up to 50,000 chars
+  sh.getRange("B1").setValue(new Date());
+}
+function readBackup_() {
+  var v = backupSheet_().getRange("A1").getValue();
+  return v ? String(v) : "{}";
+}
 
 /* ------------------------------------------------------------------ *
  *  Reminders tracking sheet

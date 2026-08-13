@@ -63,6 +63,7 @@ const DebtorsDB = {
   get: (id) => tx("debtors", "readonly", (s) => s.get(Number(id))),
   getAll: () => tx("debtors", "readonly", (s) => s.getAll()),
   delete: (id) => tx("debtors", "readwrite", (s) => s.delete(Number(id))),
+  clear: () => tx("debtors", "readwrite", (s) => s.clear()),
 };
 
 /* -------------------- Payments -------------------- */
@@ -73,6 +74,7 @@ const PaymentsDB = {
   get: (id) => tx("payments", "readonly", (s) => s.get(Number(id))),
   getAll: () => tx("payments", "readonly", (s) => s.getAll()),
   delete: (id) => tx("payments", "readwrite", (s) => s.delete(Number(id))),
+  clear: () => tx("payments", "readwrite", (s) => s.clear()),
 
   /** All payments belonging to one debtor, via the debtorId index. */
   getByDebtor: (debtorId) =>

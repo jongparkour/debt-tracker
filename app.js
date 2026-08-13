@@ -173,6 +173,78 @@ function flushSyncQueue() {
   );
 }
 
+/* -------------------- Cloud backup & restore --------------------
+   A full copy of ALL debtors + payments is saved to the Apps Script Web App (your Google
+   Sheet's "Backup" tab). Restores keep the same internal ids so payment links stay intact. */
+
+let _backupTimer = null;
+/** Debounced auto-backup — call after any data change. */
+function scheduleBackup() {
+  if (!getSyncConfig().url) return;
+  clearTimeout(_backupTimer);
+  _backupTimer = setTimeout(() => {
+    cloudBackup();
+  }, 2500);
+}
+/** Push a full snapshot to the cloud (fire-and-forget). */
+async function cloudBackup() {
+  const cfg = getSyncConfig();
+  if (!cfg.url) return;
+  try {
+    const [debtors, payments] = await Promise.all([
+      DebtorsDB.getAll(),
+      PaymentsDB.getAll(),
+    ]);
+    // SAFETY: never overwrite a good cloud backup with an empty device (e.g. after a wipe).
+    if (!debtors.length) return;
+    const payload = JSON.stringify({
+      token: cfg.token,
+      type: "backup",
+      data: { v: 1, debtors, payments },
+    });
+    fetch(cfg.url, { method: "POST", mode: "no-cors", body: payload }).catch(() => {});
+    try {
+      localStorage.setItem("dt_lastBackup", new Date().toISOString());
+    } catch (e) {}
+  } catch (e) {
+    /* best-effort */
+  }
+}
+/** Pull the latest cloud snapshot and replace local data (with confirmation). */
+async function restoreFromCloud() {
+  const cfg = getSyncConfig();
+  if (!cfg.url) return toast("Cloud backup isn't set up on this app.");
+  let data;
+  try {
+    const res = await fetch(
+      cfg.url + "?action=backup&token=" + encodeURIComponent(cfg.token),
+      { cache: "no-store" }
+    );
+    data = await res.json();
+  } catch (e) {
+    return toast("Couldn't reach the cloud backup. Check connection / redeploy the script.");
+  }
+  if (!data || !Array.isArray(data.debtors) || !data.debtors.length)
+    return toast("No cloud backup found yet.");
+  const dN = data.debtors.length,
+    pN = Array.isArray(data.payments) ? data.payments.length : 0;
+  if (
+    !confirm(
+      `Restore ${dN} debtor(s) and ${pN} payment(s) from the cloud?\n\nThis REPLACES what's on this device.`
+    )
+  )
+    return;
+  await DebtorsDB.clear();
+  await PaymentsDB.clear();
+  for (const d of data.debtors) await DebtorsDB.put(d); // put keeps original ids → links intact
+  for (const p of data.payments || []) await PaymentsDB.put(p);
+  toast(`Restored ${dN} debtor(s), ${pN} payment(s). ✓`);
+  if (window.showList) showList();
+  loadDebtors(true);
+}
+window.cloudBackup = cloudBackup;
+window.restoreFromCloud = restoreFromCloud;
+
 /** Resolve the whole person from any of their loan ids. */
 async function personFromRep(repId) {
   const rep = await DebtorsDB.get(repId);
@@ -669,6 +741,7 @@ async function pullSignups(silent) {
   }
 
   if (added > 0) {
+    scheduleBackup();
     if (currentDetailKey == null) loadDebtors();
     else refreshCurrentView();
     toast(
@@ -867,6 +940,7 @@ function openAddDebtor() {
       closeModal();
       toast("Debtor added.");
       syncDebtorById(id); // enrol in the plan-based reminder engine
+      scheduleBackup();
       loadDebtors(true);
     }
   );
@@ -885,6 +959,7 @@ async function deleteLoan(id) {
   await PaymentsDB.deleteByDebtor(id);
   await DebtorsDB.delete(id);
   toast("Debt entry deleted.");
+  scheduleBackup();
   refreshCurrentView();
 }
 
@@ -910,6 +985,7 @@ async function deletePerson(repId) {
     await DebtorsDB.delete(loan.id);
   }
   toast("Person deleted.");
+  scheduleBackup();
   if (currentDetailKey === key) showList();
   else loadDebtors();
 }
@@ -927,6 +1003,7 @@ async function addPayment(debtorId, amount, dateISO) {
   });
   toast("Payment recorded.");
   syncDebtorById(debtorId, amt); // Pro: auto-confirmation email (if sync is set up)
+  scheduleBackup();
   const person = await personFromRep(debtorId);
   refreshCurrentView();
   // Offer a tap-to-send receipt (email / text) with the running summary.
@@ -990,6 +1067,7 @@ async function recoverPayments() {
           for (const p of orphans) await PaymentsDB.put({ ...p, debtorId: target });
           closeModal();
           toast(`Re-linked ${orphans.length} payment${orphans.length !== 1 ? "s" : ""}. ✓`);
+          scheduleBackup();
           if (window.showList) showList();
           loadDebtors(true);
         }
@@ -1037,6 +1115,7 @@ async function deletePayment(paymentId) {
   if (!confirm("Delete this payment?")) return;
   await PaymentsDB.delete(paymentId);
   toast("Payment deleted.");
+  scheduleBackup();
   refreshCurrentView();
 }
 
@@ -1474,6 +1553,7 @@ async function editDebtor(id) {
       toast("Updated.");
       currentDetailKey = normName(name); // follow a possible rename
       syncDebtorById(id); // re-sync the plan to the reminder engine
+      scheduleBackup();
       refreshCurrentView();
     }
   );
@@ -1503,6 +1583,7 @@ function addLoan(name) {
       closeModal();
       toast("Debt entry added.");
       syncDebtorById(nid); // re-sync the plan to the reminder engine
+      scheduleBackup();
       refreshCurrentView();
     }
   );
@@ -1919,6 +2000,7 @@ async function importDataCSV(file) {
   }
 
   await loadDebtors();
+  scheduleBackup();
   toast(
     `Imported ${dCount} debtor${dCount !== 1 ? "s" : ""}, ${pCount} payment${
       pCount !== 1 ? "s" : ""
@@ -2061,7 +2143,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.35";
+const APP_VERSION = "3.36";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.

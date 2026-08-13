@@ -108,6 +108,12 @@ auto-imports on open. **Backend-configured feed, per-device filtering:**
 - Updates on app open only (no closed-app push without the Pro backend).
 
 ## Data & safety
-- All data is in IndexedDB on the device — nothing is uploaded, nothing is in the repo.
-- CSV export/import is the backup path (headers include Due Date + Note as of v3.2).
-- The lock gates *access*; it does not encrypt stored data.
+- Data is in IndexedDB on the device. **v3.35** requests `navigator.storage.persist()` on boot so
+  mobile browsers don't evict it (that eviction wiped a user's data pre-v3.35).
+- **Cloud backup (v3.36):** `cloudBackup()`/`scheduleBackup()` POST a full `{debtors,payments}`
+  snapshot (type `"backup"`) to `PAYMENT_SYNC_URL` on every change (debounced); stored in the
+  script's **"Backup"** tab (A1 JSON). `restoreFromCloud()` GETs `?action=backup&token=…` and
+  replaces local data with `DebtorsDB.put`/`PaymentsDB.put` (keeps original ids → payment links
+  survive). **An empty device never backs up** (guard against wiping the cloud copy). Settings →
+  Backup & recovery. Also `recoverPayments()` = Data-check + re-link orphaned payments.
+- CSV export/import is the manual backup path. The lock gates *access*; it does not encrypt data.

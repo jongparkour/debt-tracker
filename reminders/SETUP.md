@@ -16,6 +16,13 @@ due day** you set in the app — **no due-date column needed, the plan IS the sc
 The app syncs each debtor's plan + due day + live balance to this Web App (the same private
 endpoint your payment receipts use). A **"Reminders"** tab is created automatically to track everyone.
 
+### ☁️ Automatic cloud backup (data-loss protection)
+The app now saves a **full copy of every debtor + payment** to this same Web App on each change
+(stored in an auto-created **"Backup"** tab, cell A1, as JSON). If a phone ever loses its local
+data, open **Settings → Backup & recovery → ♻️ Restore from cloud** to bring everything back
+(same script, same `/exec` URL — just re-deploy a **New version** so the backup endpoints are live).
+An empty device never overwrites a good backup.
+
 ### How the pieces fit (Forms → Sheet → App → Apps Script)
 - **Google Form + its responses sheet** = the **sign-up inbox** only (Name, Total, Email, Phone,
   Code). The app imports new sign-ups from it. **Remove the form's old "Due Date" question — it's

@@ -485,11 +485,14 @@
 
       <section class="settings-card">
         <div class="settings-card-head">
-          <div class="settings-card-icon">🛟</div>
-          <div class="settings-card-title"><h2>Recover payments</h2>
-            <p>Find payments that got detached from a debtor and re-link them.</p></div>
+          <div class="settings-card-icon">☁️</div>
+          <div class="settings-card-title"><h2>Backup &amp; recovery</h2>
+            <p>Your data auto-saves to the cloud on every change. Restore it on any device if it's ever lost.</p></div>
         </div>
-        <button type="button" class="btn" id="s_recoverBtn" style="width:100%;">🛟 Scan for lost payments</button>
+        <button type="button" class="btn primary" id="s_restoreBtn" style="width:100%;">♻️ Restore from cloud</button>
+        <button type="button" class="btn" id="s_backupBtn" style="width:100%;margin-top:8px;">☁️ Back up now</button>
+        <button type="button" class="btn" id="s_recoverBtn" style="width:100%;margin-top:8px;">🛟 Data check / re-link payments</button>
+        <p class="pin-help" id="s_backupInfo"></p>
       </section>
 
       <section class="settings-card">
@@ -756,10 +759,31 @@
       lockNow();
     });
 
-    // ----- Recover payments (re-link orphaned payments) -----
+    // ----- Backup & recovery -----
+    $("s_restoreBtn").addEventListener("click", () => {
+      if (window.restoreFromCloud) restoreFromCloud();
+    });
+    $("s_backupBtn").addEventListener("click", async () => {
+      if (!window.cloudBackup) return;
+      await cloudBackup();
+      if (window.toast) toast("Backed up to cloud.");
+      showBackupInfo();
+    });
     $("s_recoverBtn").addEventListener("click", () => {
       if (window.recoverPayments) recoverPayments();
     });
+    function showBackupInfo() {
+      const el = $("s_backupInfo");
+      if (!el) return;
+      let last = "";
+      try {
+        last = localStorage.getItem("dt_lastBackup") || "";
+      } catch (e) {}
+      el.textContent = last
+        ? "Last backup: " + new Date(last).toLocaleString()
+        : "No backup yet on this device — tap “Back up now”.";
+    }
+    showBackupInfo();
 
     // ----- About (description in a simple modal) -----
     $("s_aboutBtn").addEventListener("click", () => {
