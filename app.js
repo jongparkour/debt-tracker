@@ -776,7 +776,7 @@ function openSignupQR() {
       <div class="qr-img" id="add_qr"></div>
       <p class="qr-cap">Scan to sign up as a debtor</p>
       <div class="qr-actions">
-        <button type="button" class="btn small" id="add_copy">Copy link</button>
+        <button type="button" class="btn small" id="add_open">Open link</button>
         <button type="button" class="btn small hidden" id="add_share">Share…</button>
       </div>
     </div>
@@ -792,13 +792,10 @@ function openSignupQR() {
     qr.make();
     $("add_qr").innerHTML = qr.createImgTag(5, 16, "Sign-up form");
   } catch (e) {}
-  $("add_copy").addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(link);
-      toast("Link copied.");
-    } catch (e) {
-      toast("Couldn't copy — long-press the link to copy it.");
-    }
+  $("add_open").addEventListener("click", () => {
+    // Open the sign-up form directly (e.g. hand the phone to the debtor to fill it).
+    const w = window.open(link, "_blank", "noopener");
+    if (!w) window.location.href = link;
   });
   const sh = $("add_share");
   if (navigator.share) {
@@ -1989,7 +1986,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.30";
+const APP_VERSION = "3.31";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
