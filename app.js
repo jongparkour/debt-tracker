@@ -933,51 +933,73 @@ async function addPayment(debtorId, amount, dateISO) {
   if (person && (person.email || person.phone)) showPaymentReceipt(person, amt);
 }
 
-/** Recovery: find payments whose debtorId no longer matches any debtor (orphaned — e.g. the
- *  debtor was re-added/re-imported and got a new internal id) and offer to re-link them to a
- *  chosen debtor. Non-destructive: it only reassigns links, never deletes anything. */
+/** Data check + recovery: shows exactly what's stored (debtors, payment counts, and any
+ *  payments detached from a debtor), and offers to re-link the detached ones. Non-destructive. */
 async function recoverPayments() {
   const [debtors, pays] = await Promise.all([DebtorsDB.getAll(), PaymentsDB.getAll()]);
-  if (!pays.length) return toast("No payments are stored on this device.");
   const ids = new Set(debtors.map((d) => d.id));
   const orphans = pays.filter((p) => !ids.has(p.debtorId));
-  if (!orphans.length)
-    return toast(`All ${pays.length} payments are linked — nothing to recover.`);
-
   const persons = buildPersons(debtors, pays);
-  if (!persons.length)
-    return toast("Add the debtor back first, then run recovery to re-link their payments.");
 
-  const total = orphans.reduce((s, p) => s + Number(p.amount || 0), 0);
-  const opts = persons
-    .map((p) => `<option value="${p.payToId}">${esc(p.name)}</option>`)
-    .join("");
-  const list = orphans
-    .slice(0, 25)
+  // Per-debtor summary so you can see WHERE the payments actually are.
+  const rows =
+    persons
+      .map(
+        (p) =>
+          `<li><b>${esc(p.name)}</b> — ${peso(p.remaining)} left · ${
+            p.payments.length
+          } payment${p.payments.length !== 1 ? "s" : ""} · ${peso(p.paid)} paid</li>`
+      )
+      .join("") || "<li>No debtors stored.</li>";
+
+  const orphanTotal = orphans.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const orphanList = orphans
+    .slice(0, 20)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .map((p) => `<li>${peso(p.amount)} · ${fmtDate(p.date)}</li>`)
     .join("");
+  const targetOpts = persons
+    .map((p) => `<option value="${p.payToId}">${esc(p.name)}</option>`)
+    .join("");
+
+  const canRelink = orphans.length > 0 && persons.length > 0;
   openModal(
-    "Recover payments",
+    "Data check",
     `
-    <p class="modal-intro">Found <b>${orphans.length}</b> unlinked payment${
-      orphans.length !== 1 ? "s" : ""
-    } totaling <b>${peso(total)}</b>. These got detached from a debtor — re-attach them to:</p>
-    <div class="field"><label>Debtor</label><select id="rec_target">${opts}</select></div>
-    <ul class="about-list">${list}</ul>
-    ${orphans.length > 25 ? `<p class="pin-help">…and ${orphans.length - 25} more.</p>` : ""}
-  `,
-    async () => {
-      const target = Number($("rec_target").value);
-      if (!target) return;
-      for (const p of orphans) await PaymentsDB.put({ ...p, debtorId: target });
-      closeModal();
-      toast(`Re-linked ${orphans.length} payment${orphans.length !== 1 ? "s" : ""}. ✓`);
-      if (window.showList) showList();
-      loadDebtors(true);
+    <p class="modal-intro">Stored on this device: <b>${debtors.length}</b> debtor${
+      debtors.length !== 1 ? "s" : ""
+    } · <b>${pays.length}</b> payment${pays.length !== 1 ? "s" : ""} (linked ${
+      pays.length - orphans.length
+    }, unlinked <b>${orphans.length}</b>).</p>
+    <ul class="about-list">${rows}</ul>
+    ${
+      canRelink
+        ? `<p class="modal-intro" style="margin-top:14px;">Re-attach the <b>${orphans.length}</b> unlinked
+             payment${orphans.length !== 1 ? "s" : ""} (<b>${peso(orphanTotal)}</b>) to:</p>
+           <div class="field"><label>Debtor</label><select id="rec_target">${targetOpts}</select></div>
+           <ul class="about-list">${orphanList}</ul>`
+        : pays.length === 0
+        ? `<p class="pin-help" style="margin-top:10px;">⚠️ No payments are stored — they aren't just unlinked, they're not in the database. A backup CSV (Import CSV) is the only way back.</p>`
+        : `<p class="pin-help" style="margin-top:10px;">Every payment is attached to a debtor above. If one looks "reset", check for a duplicate name in the list.</p>`
     }
+  `,
+    canRelink
+      ? async () => {
+          const target = Number($("rec_target").value);
+          if (!target) return;
+          for (const p of orphans) await PaymentsDB.put({ ...p, debtorId: target });
+          closeModal();
+          toast(`Re-linked ${orphans.length} payment${orphans.length !== 1 ? "s" : ""}. ✓`);
+          if (window.showList) showList();
+          loadDebtors(true);
+        }
+      : null
   );
-  $("modalSave").textContent = "Re-link payments";
+  if (canRelink) $("modalSave").textContent = "Re-link payments";
+  else {
+    $("modalSave").style.display = "none";
+    $("modalCancel").textContent = "Close";
+  }
 }
 window.recoverPayments = recoverPayments;
 
@@ -2039,7 +2061,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.33";
+const APP_VERSION = "3.34";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
