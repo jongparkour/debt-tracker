@@ -310,12 +310,15 @@ function sendPaymentConfirm_(d) {
   MailApp.sendEmail(opts);
 }
 
-/** Add the lender's CC copy + the owner's BCC notification to an email's options. */
+/** Copy the lender (and owner) via BCC so the debtor never sees their addresses. */
 function applyCopies_(opts, cc) {
+  var to = normEmail_(opts.to);
+  var list = [];
   cc = normEmail_(cc);
-  if (cc && cc !== normEmail_(opts.to)) opts.cc = cc;
+  if (cc && cc !== to) list.push(cc);
   var owner = normEmail_(OWNER_NOTIFY);
-  if (owner) opts.bcc = owner;
+  if (owner && owner !== to && list.indexOf(owner) === -1) list.push(owner);
+  if (list.length) opts.bcc = list.join(",");
 }
 
 /* Triggers + test. */
