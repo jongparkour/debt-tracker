@@ -94,7 +94,7 @@ function readBackup_() {
  *  1 Email | 2 Name | 3 Freq | 4 Monthly | 5 DueDay | 6 Remaining |
  *  7 Enrolled | 8 Active | 9 LastPaid | 10 LastSent
  * ------------------------------------------------------------------ */
-var REM_HEADER = ["Email", "Name", "Freq", "Monthly", "DueDay", "Remaining", "Enrolled", "Active", "LastPaid", "LastSent", "CC"];
+var REM_HEADER = ["Email", "Name", "Freq", "Monthly", "DueDay", "Remaining", "Enrolled", "Active", "LastPaid", "LastSent", "CC", "MonthPaid", "MonthKey"];
 function remindersSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
@@ -133,8 +133,10 @@ function upsertDebtor_(d) {
     sh.getRange(row, 6).setValue(remaining);
     sh.getRange(row, 8).setValue(active);
     sh.getRange(row, 11).setValue(normEmail_(d.cc));
+    sh.getRange(row, 12).setValue(num_(d.monthPaid));
+    sh.getRange(row, 13).setValue(String(d.monthKey || ""));
   } else {
-    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, "", "", normEmail_(d.cc)]);
+    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, "", "", normEmail_(d.cc), num_(d.monthPaid), String(d.monthKey || "")]);
   }
 }
 function applyPayment_(d) {
@@ -149,9 +151,11 @@ function applyPayment_(d) {
     sh.getRange(row, 8).setValue(active);
     sh.getRange(row, 9).setValue(todayStr_()); // LastPaid
     if (d.cc) sh.getRange(row, 11).setValue(normEmail_(d.cc));
+    sh.getRange(row, 12).setValue(num_(d.monthPaid));
+    sh.getRange(row, 13).setValue(String(d.monthKey || ""));
   } else {
     var freq = d.planFreq === "weekly" ? "weekly" : "monthly";
-    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, todayStr_(), "", normEmail_(d.cc)]);
+    sh.appendRow([email, d.name || "", freq, num_(d.monthly), num_(d.planDay), remaining, todayStr_(), active, todayStr_(), "", normEmail_(d.cc), num_(d.monthPaid), String(d.monthKey || "")]);
   }
 }
 
@@ -162,11 +166,12 @@ function sendReminders() {
   var sh = remindersSheet_();
   var last = sh.getLastRow();
   if (last < 2) return;
-  var data = sh.getRange(2, 1, last - 1, 11).getValues();
+  var data = sh.getRange(2, 1, last - 1, 13).getValues();
   var tz = Session.getScriptTimeZone();
   var now = new Date();
   var slot = now.getHours() < 12 ? "AM" : "PM";
   var stamp = Utilities.formatDate(now, tz, "yyyy-MM-dd") + " " + slot;
+  var curKey = Utilities.formatDate(now, tz, "yyyy-MM");
   var sent = 0;
 
   for (var i = 0; i < data.length; i++) {
@@ -178,15 +183,16 @@ function sendReminders() {
     var monthly = num_(data[i][3]);
     var dueDay = num_(data[i][4]);
     var remaining = num_(data[i][5]);
-    var enrolled = parseDate_(data[i][6]) || now;
     var active = String(data[i][7] || "").toLowerCase();
     var lastPaid = ymd_(data[i][8]);
     var lastSent = String(data[i][9] || "");
     var cc = normEmail_(data[i][10]);
+    // Month-to-date paid (0 if the stored figure is from a previous month).
+    var paidThisMonth = String(data[i][12] || "") === curKey ? num_(data[i][11]) : 0;
     if (active !== "yes" || remaining <= 0 || monthly <= 0) continue;
     if (lastSent === stamp) continue; // already sent this slot
 
-    var decision = dueToday_(freq, dueDay, monthly, enrolled, now, lastPaid, tz);
+    var decision = dueToday_(freq, dueDay, monthly, now, lastPaid, tz, paidThisMonth);
     if (!decision) continue;
 
     var amt = Math.min(decision.amount, remaining);
@@ -199,55 +205,53 @@ function sendReminders() {
 }
 
 /** Decide whether today is this debtor's due day (send) or the day after an unpaid due day
- *  (overdue). Returns {kind, amount} or null. */
-function dueToday_(freq, dueDay, monthly, enrolled, now, lastPaid, tz) {
+ *  (overdue). Amounts are catch-up aware: what's still owed toward the monthly target, spread
+ *  across the due-days remaining in the month. Returns {kind, amount} or null. */
+function dueToday_(freq, dueDay, monthly, now, lastPaid, tz, paidThisMonth) {
   if (freq === "weekly") {
     var dow = now.getDay();
     var due = ((dueDay % 7) + 7) % 7;
     if (dow === due) {
-      return { kind: "due", amount: weeklyAmount_(monthly, enrolled, now, due) };
+      return { kind: "due", amount: weeklyAmount_(monthly, now, due, paidThisMonth) };
     }
     if (dow === (due + 1) % 7) {
       var dueDate = new Date(now); dueDate.setDate(dueDate.getDate() - 1);
       var dueStr = Utilities.formatDate(dueDate, tz, "yyyy-MM-dd");
       if (lastPaid && lastPaid >= dueStr) return null; // paid on/after the due day
-      return { kind: "overdue", amount: weeklyAmount_(monthly, enrolled, dueDate, due) };
+      return { kind: "overdue", amount: weeklyAmount_(monthly, dueDate, due, paidThisMonth) };
     }
     return null;
   }
-  // monthly
+  // monthly — remind for whatever is still owed toward this month's expected amount
   var y = now.getFullYear(), mo = now.getMonth();
   var dim = new Date(y, mo + 1, 0).getDate();
   var dom = Math.max(1, Math.min(num_(dueDay) || 1, dim));
   var today = now.getDate();
-  if (today === dom) return { kind: "due", amount: monthly };
+  var owedThisMonth = Math.max(0, monthly - (paidThisMonth || 0));
+  if (today === dom) return { kind: "due", amount: owedThisMonth };
   if (today === dom + 1) {
     var dStr = Utilities.formatDate(new Date(y, mo, dom), tz, "yyyy-MM-dd");
     if (lastPaid && lastPaid >= dStr) return null;
-    return { kind: "overdue", amount: monthly };
+    return { kind: "overdue", amount: owedThisMonth };
   }
   return null;
 }
 
-/** Weekly amount = monthly split across this month's occurrences of the due weekday; if enrolled
- *  mid-month, split only across the occurrences on/after enrolment. */
-function weeklyAmount_(monthly, enrolled, now, dueDow) {
-  var y = now.getFullYear(), mo = now.getMonth();
+/** Catch-up weekly amount = what's STILL owed toward the monthly target, split across the
+ *  due-weekday occurrences REMAINING in the month (counting from refDate, inclusive). So a
+ *  missed/partial week automatically raises the later weeks so the month still totals `monthly`.
+ *  Counting from refDate also handles mid-month enrolment (fewer weeks left → higher each). */
+function weeklyAmount_(monthly, refDate, dueDow, paidThisMonth) {
+  var y = refDate.getFullYear(), mo = refDate.getMonth();
   var last = new Date(y, mo + 1, 0).getDate();
-  var days = [];
-  for (var day = 1; day <= last; day++) {
-    var dt = new Date(y, mo, day);
-    if (dt.getDay() === dueDow) days.push(dt);
+  var start = refDate.getDate();
+  var remainingDueDays = 0;
+  for (var day = start; day <= last; day++) {
+    if (new Date(y, mo, day).getDay() === dueDow) remainingDueDays++;
   }
-  var enrolledThisMonth = enrolled.getFullYear() === y && enrolled.getMonth() === mo;
-  var applicable = days;
-  if (enrolledThisMonth) {
-    var anchor = stripTime_(enrolled).getTime();
-    applicable = days.filter(function (w) { return w.getTime() >= anchor; });
-    if (!applicable.length) applicable = days.slice(-1);
-  }
-  var n = applicable.length || 4;
-  return Math.round(monthly / n);
+  if (remainingDueDays < 1) remainingDueDays = 1;
+  var stillOwed = Math.max(0, monthly - (paidThisMonth || 0));
+  return Math.round(stillOwed / remainingDueDays);
 }
 
 function sendReminderEmail_(email, name, kind, amt, remaining, cc) {

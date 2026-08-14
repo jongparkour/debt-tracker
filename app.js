@@ -587,6 +587,13 @@ async function syncDebtorById(repId, paymentAmount) {
       (p) => p.key === normName(rep.name)
     );
     if (!person) return;
+    // Month-to-date paid (so the server can keep each month on target for the monthly expected).
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthPaid = (person.payments || [])
+      .filter((p) => new Date(p.date) >= monthStart)
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const base = {
       key: person.key,
       name: person.name,
@@ -598,6 +605,8 @@ async function syncDebtorById(repId, paymentAmount) {
       monthly: Number(person.planAmount) || Number(person.monthlyTarget) || 0,
       planDay: person.planDay != null ? Number(person.planDay) : person.planFreq === "weekly" ? 6 : 1,
       cc: getLenderEmail(), // this user gets copied on their debtors' emails
+      monthPaid, // ₱ paid so far this calendar month
+      monthKey, // which month monthPaid applies to (yyyy-MM)
     };
     if (paymentAmount)
       postSync("payment_added", { ...base, amount: Number(paymentAmount) });
@@ -2205,7 +2214,7 @@ if ("serviceWorker" in navigator) {
 
 /* -------------------- Maker's mark -------------------- */
 
-const APP_VERSION = "3.38";
+const APP_VERSION = "3.39";
 window.APP_VERSION = APP_VERSION;
 
 // Console signature — a little relic for anyone who opens DevTools.
