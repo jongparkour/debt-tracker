@@ -388,8 +388,7 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">☀️</div>
-          <div class="settings-card-title"><h2>Appearance</h2>
-            <p>Choose how Debt Tracker looks on this device.</p></div>
+          <div class="settings-card-title"><h2>Appearance</h2></div>
         </div>
         <div class="theme-seg" id="s_themeSeg">
           <button type="button" class="seg-btn" data-theme="light">☀️ Light</button>
@@ -400,8 +399,7 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">🛡️</div>
-          <div class="settings-card-title"><h2>Security</h2>
-            <p>Protect your balances with a PIN and privacy options.</p></div>
+          <div class="settings-card-title"><h2>Security</h2></div>
         </div>
         <div class="field-row">
           <div class="field"><label>New PIN</label>
@@ -445,8 +443,7 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">🔗</div>
-          <div class="settings-card-title"><h2>Share the app</h2>
-            <p>Let others scan a QR code to install it.</p></div>
+          <div class="settings-card-title"><h2>Share the app</h2></div>
         </div>
         <button type="button" class="btn primary" id="s_qrBtn" style="width:100%;">📱 Show install QR code</button>
         <div id="s_qrWrap" class="qr-box hidden">
@@ -462,20 +459,15 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">📧</div>
-          <div class="settings-card-title"><h2>Auto reminders <span class="pro-badge">PRO</span></h2>
-            <p>Free: tap <b>✉️</b> / <b>💬</b> on any debtor to send a reminder in one tap.
-               <b>Pro</b> would send them <b>fully automatically</b> — reminders + payment
-               confirmations, even when your phone is off.</p></div>
+          <div class="settings-card-title"><h2>Auto reminders <span class="pro-badge">PRO</span></h2></div>
         </div>
         <button type="button" class="btn primary" id="s_proBtn" style="width:100%;">⚡ Upgrade to Pro</button>
-        <p class="pin-help">Pro will be a small paid add-on (price still being set). Tapping this just sends a request — no charge yet. We'll enable it and set fair pricing once enough people ask.</p>
       </section>
 
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">💬</div>
-          <div class="settings-card-title"><h2>Feedback</h2>
-            <p>Tell us what's working and what isn't.</p></div>
+          <div class="settings-card-title"><h2>Feedback</h2></div>
         </div>
         <div class="field">
           <textarea id="s_feedback" rows="4" maxlength="1000" placeholder="Share an idea or report a problem…"></textarea>
@@ -488,9 +480,7 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">📩</div>
-          <div class="settings-card-title"><h2>Copy me on reminders</h2>
-            <p>Get CC'd on every reminder &amp; receipt sent to your debtors. Use a business or
-               notifications email, not your personal one.</p></div>
+          <div class="settings-card-title"><h2>Copy me on reminders</h2></div>
         </div>
         <div class="field">
           <input id="s_lenderEmail" type="email" inputmode="email" placeholder="you@business.com" />
@@ -501,8 +491,7 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">☁️</div>
-          <div class="settings-card-title"><h2>Backup &amp; recovery</h2>
-            <p>Your data auto-saves to the cloud on every change. Restore it on any device if it's ever lost.</p></div>
+          <div class="settings-card-title"><h2>Backup &amp; recovery</h2></div>
         </div>
         <button type="button" class="btn primary" id="s_restoreBtn" style="width:100%;">♻️ Restore from cloud</button>
         <button type="button" class="btn" id="s_backupBtn" style="width:100%;margin-top:8px;">☁️ Back up now</button>
@@ -513,8 +502,7 @@
       <section class="settings-card">
         <div class="settings-card-head">
           <div class="settings-card-icon">ℹ️</div>
-          <div class="settings-card-title"><h2>About</h2>
-            <p>What this app is and how it keeps your data.</p></div>
+          <div class="settings-card-title"><h2>About</h2></div>
         </div>
         <button type="button" class="btn" id="s_aboutBtn" style="width:100%;">ℹ️ About Debt Tracker</button>
       </section>
